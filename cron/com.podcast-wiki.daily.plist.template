@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.podcast-wiki.daily</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>@PODMIND_REPO@/cron/daily.sh</string>
+    </array>
+
+    <!-- Data folder, not code folder. daily.sh cd's here on entry so all
+         relative paths (wiki/log.md, raw/episodes/, .envrc) resolve. -->
+    <key>WorkingDirectory</key>
+    <string>@PODMIND_DATA_ROOT@</string>
+
+    <!-- Run daily at 04:00 local time. If the Mac was asleep at the trigger, launchd
+         catches up automatically when it wakes. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>4</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- Capture stdout/stderr separately for debugging the launch itself.
+         The script also writes its own structured log to wiki/log.md. -->
+    <key>StandardOutPath</key>
+    <string>@HOME@/Library/Logs/podcast-wiki-daily.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>@HOME@/Library/Logs/podcast-wiki-daily.stderr.log</string>
+
+    <!-- Inherit the user's login PATH so uv resolves; pass the data root
+         so daily.sh can `cd "$PODMIND_DATA_ROOT"` without hardcoding it. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>@HOME@</string>
+        <key>PODMIND_DATA_ROOT</key>
+        <string>@PODMIND_DATA_ROOT@</string>
+    </dict>
+</dict>
+</plist>

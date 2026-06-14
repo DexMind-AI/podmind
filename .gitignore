@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (anything containing a key)
+.env
+.env.local
+*.env
+secrets.json
+secrets/
+
+# Data — never check vault contents into the code repo
+# (anchored to repo root so examples/demo-vault/{raw,wiki} stay tracked)
+/raw/
+/wiki/
+/data/
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.vtt
+
+# Local logs
+*.log
+logs/
+
+# rendered by scripts/install_launchd.sh (templates are tracked)
+cron/com.podcast-wiki.daily.plist
+cron/com.podcast-wiki.whisper.plist
+
+# Project-specific scratch
+/tmp/
+tmp/
+.claude/
+brainstorm-*.md
+impl-log-*.md
+.envrc

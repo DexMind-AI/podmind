@@ -1,0 +1,42 @@
+{
+  "raw_dir": "signals-and-noise/2026-05-02-why-transcripts-beat-show-notes",
+  "show_slug": "signals-and-noise",
+  "show_name": "Signals & Noise",
+  "date": "2026-05-02",
+  "title": "Why Transcripts Beat Show Notes",
+  "title_slug": "why-transcripts-beat-show-notes",
+  "guests": ["Tomas Ek"],
+  "listened": true,
+  "played_up_to": 1860,
+  "duration_min": 31,
+  "transcript_source": "rss",
+  "hook": "Tomas Ek built a search engine over his own listening history — and found the real blocker was transcripts, not search.",
+  "takeaways": [
+    "Only ~1 in 50 podcast feeds publishes a real transcript; show notes are marketing copy and you can't search aspirations.",
+    "His transcript cascade: published RSS transcript first, YouTube auto-captions second, local Whisper overnight as the last resort (~a third of episodes).",
+    "The economics flipped around 2024 when consumer laptops began transcribing faster than real time — the hard part became plumbing, not compute.",
+    "Once episodes become greppable pages, listening stops being ephemeral; he annotates claims and tracks which guests turned out to be right.",
+    "The transcript isn't the product — the accumulated cross-references are."
+  ],
+  "quotes": [
+    {
+      "text": "Show notes tell you what the producer hoped the episode was about; the transcript tells you what was actually said.",
+      "attribution": "Tomas Ek",
+      "timestamp": "00:02:40"
+    },
+    {
+      "text": "A transcript on its own is a haystack. Two hundred transcripts with a wiki on top is a memory.",
+      "attribution": "Tomas Ek",
+      "timestamp": "00:26:15"
+    }
+  ],
+  "people": [
+    {"slug": "maya-brennan", "name": "Maya Brennan", "role": "host", "note": "Host of Signals & Noise"},
+    {"slug": "tomas-ek", "name": "Tomas Ek", "role": "guest", "note": "Built Earhorn, a personal search engine over his own podcast listening history"}
+  ],
+  "topics": [
+    {"slug": "podcast-transcripts", "name": "Podcast Transcripts", "why": "Transcripts versus show notes; the rss → YouTube captions → Whisper cascade."},
+    {"slug": "personal-knowledge-bases", "name": "Personal Knowledge Bases", "why": "Two hundred transcripts with a wiki on top is a memory — listening that compounds instead of evaporating."},
+    {"slug": "full-text-search", "name": "Full-Text Search", "why": "Finding the sentence, not the summary: search over everything you've ever heard."}
+  ]
+}

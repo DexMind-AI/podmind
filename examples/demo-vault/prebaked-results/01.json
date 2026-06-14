@@ -1,0 +1,42 @@
+{
+  "raw_dir": "signals-and-noise/2026-05-16-the-economics-of-cheap-llms",
+  "show_slug": "signals-and-noise",
+  "show_name": "Signals & Noise",
+  "date": "2026-05-16",
+  "title": "The Economics of Cheap LLMs",
+  "title_slug": "the-economics-of-cheap-llms",
+  "guests": ["Daniel Voss"],
+  "listened": false,
+  "played_up_to": 707,
+  "duration_min": 31,
+  "transcript_source": "whisper",
+  "hook": "Daniel Voss on cost-per-token engineering: your LLM bill is input tokens, and the cheapest model that emits valid JSON wins.",
+  "takeaways": [
+    "Summarization cost is dominated by input tokens (~90%), so the bill scales with transcript length, not model intelligence.",
+    "Three levers — transcript truncation, provider-side prompt caching, and size-based model routing — cut costs by two thirds before any prompt tuning.",
+    "In A/B tests the cheap model missed nuance roughly one episode in twenty; the expensive one missed it too, just more eloquently. JSON validity decided the winner.",
+    "Surname fidelity is the canary metric: a model that can't copy a guest's name out of the transcript can't be trusted to paraphrase it either.",
+    "When prices fall another order of magnitude, the inversion is 'summarize everything, curate after ingestion' — bigger than any model release."
+  ],
+  "quotes": [
+    {
+      "text": "Cost-per-episode is really cost-per-input-token times transcript length. Your bill is determined by how much you make the model read, not by how smart it is.",
+      "attribution": "Daniel Voss",
+      "timestamp": "00:04:10"
+    },
+    {
+      "text": "The honest finding was that the cheapest model that reliably emits valid JSON wins, because a beautiful summary you can't parse is worth nothing.",
+      "attribution": "Daniel Voss",
+      "timestamp": "00:12:45"
+    }
+  ],
+  "people": [
+    {"slug": "maya-brennan", "name": "Maya Brennan", "role": "host", "note": "Host of Signals & Noise"},
+    {"slug": "daniel-voss", "name": "Daniel Voss", "role": "guest", "note": "Runs inference infrastructure for a summarization company; thinks in cost-per-input-token"}
+  ],
+  "topics": [
+    {"slug": "llm-cost-engineering", "name": "LLM Cost Engineering", "why": "The whole episode: truncation, caching, and routing as the real levers on an inference bill."},
+    {"slug": "summarization-pipelines", "name": "Summarization Pipelines", "why": "Production summarization at a penny and a half per podcast hour, with JSON validity as the gating metric."},
+    {"slug": "podcast-transcripts", "name": "Podcast Transcripts", "why": "Transcript length is the cost driver; the 'summarize everything ever recorded' endgame starts with transcripts."}
+  ]
+}

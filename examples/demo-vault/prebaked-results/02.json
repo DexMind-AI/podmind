@@ -1,0 +1,42 @@
+{
+  "raw_dir": "signals-and-noise/2026-05-09-local-first-knowledge-bases",
+  "show_slug": "signals-and-noise",
+  "show_name": "Signals & Noise",
+  "date": "2026-05-09",
+  "title": "Local-First Knowledge Bases",
+  "title_slug": "local-first-knowledge-bases",
+  "guests": ["Priya Nair"],
+  "listened": true,
+  "played_up_to": 2400,
+  "duration_min": 40,
+  "transcript_source": "youtube",
+  "hook": "Priya Nair on why a folder of markdown files outlives every SaaS knowledge tool — and why agents make plain text the power move.",
+  "takeaways": [
+    "Notes that can't survive the company that made the editor were never your notes — a deprecated export feature turns them into hostages.",
+    "A personal knowledge base has one user and a fifty-year horizon; no vendor roadmap survives that, but a folder of text files already has.",
+    "Plain text lets a language model be a full citizen of the wiki — reading and writing every page through the filesystem, no API keys required.",
+    "SaaS AI sidebars see one document at a time; a local agent with grep sees the whole graph.",
+    "Honest costs of local-first: mobile is genuinely worse and links rot on careless renames — weekend problems, versus the decade problem of lock-in."
+  ],
+  "quotes": [
+    {
+      "text": "So my rule now is simple: if my notes can't survive the company that made the editor, they were never my notes.",
+      "attribution": "Priya Nair",
+      "timestamp": "00:03:20"
+    },
+    {
+      "text": "Markdown is boring in the way load-bearing things should be boring.",
+      "attribution": "Priya Nair",
+      "timestamp": "00:07:55"
+    }
+  ],
+  "people": [
+    {"slug": "maya-brennan", "name": "Maya Brennan", "role": "host", "note": "Host of Signals & Noise"},
+    {"slug": "priya-nair", "name": "Priya Nair", "role": "guest", "note": "Built cloud knowledge tools for a decade, now an advocate of plain-markdown, local-first personal wikis"}
+  ],
+  "topics": [
+    {"slug": "personal-knowledge-bases", "name": "Personal Knowledge Bases", "why": "The core argument: one user, fifty-year horizon, so durability beats features."},
+    {"slug": "local-first-software", "name": "Local-First Software", "why": "Files on disk versus SaaS hostage-taking; weekend problems versus decade problems."},
+    {"slug": "markdown-wikis", "name": "Markdown Wikis", "why": "Plain markdown as the deliberately boring, load-bearing format for a lifetime of notes."}
+  ]
+}

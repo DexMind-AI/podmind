@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.podcast-wiki.whisper</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>@PODMIND_REPO@/cron/whisper.sh</string>
+    </array>
+
+    <!-- Data folder, not code folder. whisper.sh cd's here on entry. -->
+    <key>WorkingDirectory</key>
+    <string>@PODMIND_DATA_ROOT@</string>
+
+    <!-- Long-lived continuous loop. Start at load/login and auto-restart on crash.
+         Power-state gating happens inside the script (pmset -g ps). -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Cap restart rate so a tight crash-loop can't burn battery. -->
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+
+    <key>LowPriorityIO</key>
+    <true/>
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>@HOME@/Library/Logs/podcast-wiki-whisper.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>@HOME@/Library/Logs/podcast-wiki-whisper.stderr.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>@HOME@</string>
+        <key>PODMIND_DATA_ROOT</key>
+        <string>@PODMIND_DATA_ROOT@</string>
+    </dict>
+</dict>
+</plist>

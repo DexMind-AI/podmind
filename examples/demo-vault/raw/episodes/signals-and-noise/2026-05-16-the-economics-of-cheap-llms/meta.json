@@ -1,0 +1,15 @@
+{
+  "show": "Signals & Noise",
+  "show_uuid": null,
+  "show_feed_url": null,
+  "title": "The Economics of Cheap LLMs",
+  "guid": "demo:sn-003",
+  "pub_date": "2026-05-16",
+  "published_iso": "2026-05-16T06:00:00+00:00",
+  "duration_sec": 1860,
+  "audio_url": null,
+  "listened": false,
+  "played_up_to": 707,
+  "playing_status": 2,
+  "transcript_source": "whisper"
+}

@@ -1,0 +1,15 @@
+{
+  "show": "Signals & Noise",
+  "show_uuid": null,
+  "show_feed_url": null,
+  "title": "Why Transcripts Beat Show Notes",
+  "guid": "demo:sn-001",
+  "pub_date": "2026-05-02",
+  "published_iso": "2026-05-02T06:00:00+00:00",
+  "duration_sec": 1860,
+  "audio_url": null,
+  "listened": true,
+  "played_up_to": 1860,
+  "playing_status": 3,
+  "transcript_source": "rss"
+}
