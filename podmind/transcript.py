@@ -1,8 +1,9 @@
 """Transcript cascade: try RSS → publisher → podcast-index → YouTube → whisper.
 
 Each tier writes:
-    transcript.vtt   (when timestamps available)
-    transcript.md    (always; plain text, one paragraph per cue)
+    transcript.vtt.xz  (compressed VTT; plain transcript.vtt when
+                        PODMIND_COMPRESS_TRANSCRIPTS=0 — see podmind.transcripts)
+    transcript.md      (always; plain text, one paragraph per cue)
 and updates meta.json's transcript_source field.
 """
 from __future__ import annotations
@@ -22,7 +23,7 @@ import feedparser
 import httpx
 from rich.console import Console
 
-from podmind import paths, secrets
+from podmind import paths, secrets, transcripts
 
 console = Console()
 
@@ -87,18 +88,18 @@ def try_rss(d: Path, meta: dict) -> bool:
     if target is None:
         return False
 
-    transcripts = target.get("podcast_transcript") or []
-    if isinstance(transcripts, dict):
-        transcripts = [transcripts]
+    transcript_links = target.get("podcast_transcript") or []
+    if isinstance(transcript_links, dict):
+        transcript_links = [transcript_links]
     # Prefer VTT > SRT > anything.
     def rank(t: dict) -> int:
         ttype = (t.get("type") or "").lower()
         if "vtt" in ttype: return 0
         if "srt" in ttype: return 1
         return 2
-    transcripts = sorted(transcripts, key=rank)
+    transcript_links = sorted(transcript_links, key=rank)
 
-    for t in transcripts:
+    for t in transcript_links:
         url = t.get("url")
         if not url:
             continue
@@ -112,7 +113,7 @@ def try_rss(d: Path, meta: dict) -> bool:
         if "srt" in ttype or text.lstrip().startswith("1\n"):
             text = _srt_to_vtt(text)
         if "WEBVTT" in text or text.startswith("WEBVTT"):
-            (d / "transcript.vtt").write_text(text)
+            transcripts.write_vtt(d, text)
             (d / "transcript.md").write_text(_vtt_to_plaintext(text))
         else:
             # Some shows publish HTML/JSON transcripts; treat as plain text.
@@ -329,12 +330,12 @@ def try_podcast_index(d: Path, meta: dict) -> bool:
                             break
             if not ep:
                 return False
-            transcripts = ep.get("transcripts") or []
-            if not transcripts:
+            transcript_links = ep.get("transcripts") or []
+            if not transcript_links:
                 return False
             # Prefer VTT > SRT > anything.
-            transcripts = sorted(transcripts, key=lambda t: 0 if "vtt" in (t.get("type") or "").lower() else 1 if "srt" in (t.get("type") or "").lower() else 2)
-            for t in transcripts:
+            transcript_links = sorted(transcript_links, key=lambda t: 0 if "vtt" in (t.get("type") or "").lower() else 1 if "srt" in (t.get("type") or "").lower() else 2)
+            for t in transcript_links:
                 url = t.get("url")
                 if not url:
                     continue
@@ -348,7 +349,7 @@ def try_podcast_index(d: Path, meta: dict) -> bool:
                 if "srt" in ttype or text.lstrip().startswith("1\n"):
                     text = _srt_to_vtt(text)
                 if "WEBVTT" in text or text.startswith("WEBVTT"):
-                    (d / "transcript.vtt").write_text(text)
+                    transcripts.write_vtt(d, text)
                     (d / "transcript.md").write_text(_vtt_to_plaintext(text))
                 else:
                     (d / "transcript.md").write_text(text)
@@ -391,10 +392,13 @@ def try_youtube(d: Path, meta: dict) -> bool:
     # Prefer English subs when multiple langs landed.
     vtt_files.sort(key=lambda v: (0 if "en" in v.name else 1, v.name))
     vtt = vtt_files[0]
-    if vtt.name != "transcript.vtt":
-        vtt.rename(d / "transcript.vtt")
-    text = (d / "transcript.vtt").read_text()
+    text = vtt.read_text()
     (d / "transcript.md").write_text(_vtt_to_plaintext(text))
+    # Remove yt-dlp's raw VTT files (possibly language-suffixed); write_vtt
+    # re-creates the canonical transcript.vtt(.xz) from the text we hold.
+    for stray in d.glob("transcript*.vtt"):
+        stray.unlink(missing_ok=True)
+    transcripts.write_vtt(d, text)
     meta["transcript_source"] = "youtube"
     _write_meta(d, meta)
     return True
@@ -451,7 +455,7 @@ def try_whisper(d: Path, meta: dict) -> bool:
             vtt.append(f"{start} --> {end}")
             vtt.append(seg["text"].strip())
             vtt.append("")
-        (d / "transcript.vtt").write_text("\n".join(vtt))
+        transcripts.write_vtt(d, "\n".join(vtt))
         (d / "transcript.md").write_text(result.get("text", "").strip())
         meta["transcript_source"] = "whisper"
         _write_meta(d, meta)

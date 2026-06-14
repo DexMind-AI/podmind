@@ -124,7 +124,8 @@ $PODMIND_DATA_ROOT/          # the vault — data only, no code
 │   └── episodes/
 │       ├── <show-slug>/<yyyy-mm-dd>-<title-slug>/    # PC-sourced episode
 │       │   ├── meta.json
-│       │   ├── transcript.vtt   # timestamped, when available
+│       │   ├── transcript.vtt.xz   # xz-compressed timestamped transcript (plain
+│       │   │                       #   transcript.vtt if PODMIND_COMPRESS_TRANSCRIPTS=0)
 │       │   └── transcript.md    # plain text (always present once transcribed)
 │       └── yt-<channel-slug>/<watched-date>-<title-slug>/    # YouTube-watch-history-sourced
 │           └── (same files; meta.json has extra youtube_* fields)
@@ -179,7 +180,7 @@ cron/                       # launchd shell wrappers (daily.sh, whisper.sh, plis
 
 ## Transcript cascade
 
-In order, each tier writes `transcript.vtt` (when timestamps available) + `transcript.md`, sets `transcript_source`, and stops:
+In order, each tier writes `transcript.vtt.xz` (xz-compressed when timestamps available; plain `transcript.vtt` if `PODMIND_COMPRESS_TRANSCRIPTS=0`) + `transcript.md`, sets `transcript_source`, and stops:
 
 1. **`rss`** — Podcasting 2.0 `<podcast:transcript>` tag in the show's RSS feed.
 2. **`publisher`** — known-publisher web scraper. Often blocked by paywalls/bot-detection.
@@ -188,6 +189,12 @@ In order, each tier writes `transcript.vtt` (when timestamps available) + `trans
 5. **`whisper`** — local `mlx-whisper` (M-series Mac). Last resort. Requires `uv sync --extra whisper`.
 
 If all tiers fail, `transcript_source` is set to `"none"`. Re-running the cascade skips episodes already at any non-null source — to retry, set the field back to `null`.
+
+Transcripts are stored xz-compressed (`transcript.vtt.xz`) by default — the
+`transcript.md` plain text stays uncompressed for grep. To search the
+timestamped VTT, use `xzcat <dir>/transcript.vtt.xz | grep …`. The
+`bin/compress_transcripts.py` tool migrates an existing vault (`--decompress`
+reverses).
 
 ## Listened-state badges (mandatory on every episode citation)
 
@@ -221,7 +228,7 @@ When the user asks you to ingest one or more episodes:
      - YAML frontmatter (show, date, guests, listened, played_up_to, duration_min, transcript_source).
      - Listened badge in body.
      - 3–8 bullet "key takeaways."
-     - Notable quotes (with `t=HH:MM:SS` links into `transcript.vtt` if it exists).
+     - Notable quotes (with `t=HH:MM:SS` timestamps; the source is `transcript.vtt.xz`, read via `xzcat`).
      - Cross-links to `[[shows/...]]`, `[[people/...]]`, `[[topics/...]]`.
    - For each person mentioned: ensure `wiki/people/<name-slug>.md` exists; append a one-line citation back to the episode.
    - For each topic touched: same, in `wiki/topics/`.
@@ -247,7 +254,7 @@ Every non-trivial query MUST leave the wiki better than it found it. Do not "off
 
 1. **Skim `wiki/index.md`** for relevant pages.
 2. **Read those pages**; follow `[[wiki-links]]` into related entities/topics.
-3. **Fall back to raw transcripts** (`raw/episodes/*/transcript*.{md,vtt}`) only if the wiki layer doesn't have the answer. Remember: only ~1% of raw episodes have a transcript at all (`transcript_source: null` ⇒ invisible to grep). State this caveat when an answer might be incomplete.
+3. **Fall back to raw transcripts** (`raw/episodes/*/transcript.md`) only if the wiki layer doesn't have the answer. Remember: only ~1% of raw episodes have a transcript at all (`transcript_source: null` ⇒ invisible to grep). State this caveat when an answer might be incomplete. Note: `.vtt` files are stored xz-compressed (`transcript.vtt.xz`) — use `xzcat` or `xzgrep` to search them; `transcript.md` remains plain-text greppable.
 4. **Search methodology** — when looking for tools, products, people, or any open category:
    - Do NOT start from a curated keyword list. Keyword lists embed your priors and miss adjacent categories (e.g. searching only generative-AI products misses programmatic frameworks like Remotion).
    - Start with open-ended patterns over the verbs the user cares about (`\b(use|using|recommend|tried|switched to|generate|edit|render).{0,40}<noun>\b`) and let product names emerge.

@@ -9,6 +9,7 @@ a controlled tier so we can assert on the resulting counts dict.
 """
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -181,3 +182,107 @@ class TestEmptyAndEdgeCases:
         counts = transcript.transcribe_all(only_played=True, limit=10)
         # Corrupt entry was skipped during candidate building; counts all zero.
         assert all(v == 0 for v in counts.values())
+
+
+class _FakeResp:
+    def __init__(self, text):
+        self.text = text
+        self.status_code = 200
+
+    def raise_for_status(self):
+        pass
+
+
+def _rss_episode(tmp_path, monkeypatch):
+    """An episode dir + meta wired so try_rss finds a WEBVTT transcript."""
+    d = tmp_path / "raw" / "episodes" / "show-a" / "2026-01-01-x"
+    d.mkdir(parents=True)
+    meta = {"show_feed_url": "https://feed", "guid": "G1", "title": "T"}
+    vtt = "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nhi there\n"
+    entry = {"id": "G1", "podcast_transcript": {"url": "https://t.vtt", "type": "text/vtt"}}
+    monkeypatch.setattr(transcript, "feedparser",
+                        SimpleNamespace(parse=lambda _u: SimpleNamespace(entries=[entry])))
+    monkeypatch.setattr(transcript.httpx, "get", lambda *_a, **_k: _FakeResp(vtt))
+    return d, meta, vtt
+
+
+class TestCascadeCompression:
+    def test_rss_writes_xz_when_compression_on(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PODMIND_COMPRESS_TRANSCRIPTS", "1")
+        d, meta, vtt = _rss_episode(tmp_path, monkeypatch)
+        assert transcript.try_rss(d, meta) is True
+        assert (d / "transcript.vtt.xz").exists()
+        assert not (d / "transcript.vtt").exists()
+        assert "hi there" in (d / "transcript.md").read_text()
+
+    def test_rss_writes_plain_when_compression_off(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("PODMIND_COMPRESS_TRANSCRIPTS", "0")
+        d, meta, vtt = _rss_episode(tmp_path, monkeypatch)
+        assert transcript.try_rss(d, meta) is True
+        assert (d / "transcript.vtt").read_text() == vtt
+        assert not (d / "transcript.vtt.xz").exists()
+
+    def test_podcast_index_writes_xz_when_compression_on(self, tmp_path, monkeypatch):
+        """Regression: try_podcast_index local var 'transcripts' must not shadow the module."""
+        monkeypatch.setenv("PODMIND_COMPRESS_TRANSCRIPTS", "1")
+
+        d = tmp_path / "raw" / "episodes" / "show-a" / "2026-01-01-pi"
+        d.mkdir(parents=True)
+        meta = {
+            "show": "Test Show",
+            "show_feed_url": "https://feed.example/rss",
+            "guid": "guid-pi-1",
+            "title": "PI Episode",
+        }
+        vtt_text = "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\npodcast-index-marker\n"
+
+        # Mock secrets so the key/secret check passes.
+        from podmind import secrets as secrets_mod
+        monkeypatch.setattr(secrets_mod, "load", lambda: {
+            "podcast_index_key": "fake-key",
+            "podcast_index_secret": "fake-secret",
+        })
+
+        # Build fake responses for the httpx.Client context-manager calls.
+        # try_podcast_index does: byguid+feedurl → returns episode with transcripts list
+        ep_payload = {
+            "episode": {
+                "id": 1,
+                "title": "PI Episode",
+                "transcripts": [{"url": "https://t.example/ep.vtt", "type": "text/vtt"}],
+            }
+        }
+
+        class _FakeClientResp:
+            def __init__(self, payload):
+                self._payload = payload
+                self.status_code = 200
+
+            def json(self):
+                return self._payload
+
+        class _FakeClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                pass
+
+            def get(self, url, **_kwargs):
+                if "byguid" in url:
+                    return _FakeClientResp(ep_payload)
+                if "byfeedurl" in url:
+                    # Return a feed_id so the byterm search path is skipped.
+                    return _FakeClientResp({"feed": {"id": 42}})
+                # Any other API call returns empty.
+                return _FakeClientResp({})
+
+        monkeypatch.setattr(transcript.httpx, "Client", lambda **_kw: _FakeClient())
+
+        # The standalone httpx.get is used to fetch the actual transcript URL.
+        monkeypatch.setattr(transcript.httpx, "get", lambda *_a, **_k: _FakeResp(vtt_text))
+
+        assert transcript.try_podcast_index(d, meta) is True
+        assert (d / "transcript.vtt.xz").exists()
+        assert not (d / "transcript.vtt").exists()
+        assert "podcast-index-marker" in (d / "transcript.md").read_text()

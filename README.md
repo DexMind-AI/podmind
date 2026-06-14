@@ -141,6 +141,11 @@ All numbers below are **measured**, not estimated (telemetry is written to `/tmp
 - The 400 KB transcript input cap bounds worst-case per-episode cost at **~$0.027**.
 - A 100-episode backlog run lands around **$1.50**.
 - Whisper transcription is **free** locally on Apple Silicon (~5–7 min per 60-min episode on an M1).
+- **Transcripts are stored compressed** (`transcript.vtt.xz`, xz/lzma — ~6–7×
+  smaller) by default; the plain-text `transcript.md` the summarizer reads stays
+  uncompressed and greppable. Disable with `PODMIND_COMPRESS_TRANSCRIPTS=0`.
+  Migrate an existing vault with `./bin/compress_transcripts.py` (`--dry-run`
+  to preview, `--decompress` to reverse).
 - Free transcript tiers (RSS, podcast-index, YouTube subs) are always tried before whisper.
 
 One non-obvious cost of cheap hosted models: they can quietly soften politically sensitive framings. `bin/sensitivity_audit.py` scans transcripts for China-PRC sensitive markers (Tiananmen, Xinjiang, Taiwan, CCP-critique, …) and flags episodes for optional re-summarization with a stronger model — think of it as **auditing your cheap LLM provider for censorship drift**.
