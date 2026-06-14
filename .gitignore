@@ -55,3 +55,7 @@ tmp/
 brainstorm-*.md
 impl-log-*.md
 .envrc
+
+# Obsidian per-session state (not shareable)
+examples/demo-vault/.obsidian/workspace.json
+examples/demo-vault/.obsidian/workspace-mobile.json

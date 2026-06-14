@@ -6,7 +6,7 @@ A [Karpathy-style LLM-built knowledge wiki](https://gist.github.com/karpathy/442
 
 Pocket Casts listening history and YouTube watch history go in; an Obsidian-compatible, cross-linked markdown wiki comes out — one page per episode, plus people, topics, and show pages, listening-state badges on every citation, and an analytics layer over your listening history. The wiki compounds: every ingest and every query leaves more cross-links behind.
 
-<!-- screenshot slot: docs/img/wiki-graph.png — Obsidian graph view, pending -->
+![Obsidian graph view of the bundled demo vault — three episodes cross-linked through their people and topics](docs/img/wiki-graph.png)
 
 ## How it works
 
@@ -41,7 +41,7 @@ uv sync
 ./scripts/demo.sh
 ```
 
-Then open `examples/demo-vault/wiki/` in Obsidian (or any markdown editor).
+Then open `examples/demo-vault/` in Obsidian (or browse `wiki/` in any markdown editor). The vault ships a graph-view config that scopes the graph to the `wiki/` layer, so you see the cross-linked output, not the raw transcripts.
 
 The demo runs the **real pipeline** — `tick_prep.py` scans the vault for pending episodes, `tick_finalize.py` writes episode pages, people/topic stubs, the show page, the index, and a log entry — over 3 bundled synthetic episodes. The LLM summarization step is replaced by pre-baked summary JSON, so it needs zero API keys.
 
