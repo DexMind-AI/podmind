@@ -88,17 +88,10 @@ chmod 600 ~/.config/podmind/secrets.json
 
 ### LLM provider
 
-podmind speaks two wire protocols — OpenAI-compatible `chat/completions` and the Anthropic Messages API — so any mainstream provider works. Configure via env vars (`PODMIND_LLM_PROVIDER` / `PODMIND_LLM_BASE_URL` / `PODMIND_LLM_MODEL` / `PODMIND_LLM_API_KEY`) or the equivalent `llm_*` keys in secrets.json:
-
-| Provider | `PODMIND_LLM_PROVIDER` | `PODMIND_LLM_BASE_URL` | `PODMIND_LLM_MODEL` (example) |
-|---|---|---|---|
-| **DeepSeek** (default — tested, cost-measured) | `openai-compat` | `https://api.deepseek.com/v1` | `deepseek-chat` |
-| OpenAI | `openai-compat` | `https://api.openai.com/v1` | `gpt-4o-mini` |
-| OpenRouter | `openai-compat` | `https://openrouter.ai/api/v1` | `deepseek/deepseek-chat` |
-| Ollama (local) | `openai-compat` | `http://localhost:11434/v1` | `llama3.1` |
-| Anthropic | `anthropic` | `https://api.anthropic.com` | `claude-sonnet-4-6` |
-
-With no config at all, podmind defaults to DeepSeek chat — you only need an API key. Embeddings follow the same pattern with `PODMIND_EMBED_BASE_URL` / `PODMIND_EMBED_MODEL` / `PODMIND_EMBED_API_KEY` (default: OpenRouter, `openai/text-embedding-3-small`).
+**Default is DeepSeek — put one key in `secrets.json` and you're done.** podmind
+also speaks OpenAI, OpenRouter, Ollama, and Anthropic; see
+[docs/OPERATIONS.md](docs/OPERATIONS.md#llm-provider-configuration) for the
+provider matrix and embeddings config.
 
 ### First sync
 
@@ -107,10 +100,10 @@ With no config at all, podmind defaults to DeepSeek chat — you only need an AP
 uv run python -m podmind.pocketcasts login
 
 # Pull listening state + run the transcript cascade on a small batch first
-uv run python -m podmind.sync --no-whisper --limit 10
+uv run podmind sync --no-whisper --limit 10
 
-# Summarize pending episodes into the wiki (prep → LLM → finalize)
-./bin/ingest_run.py 12
+# Summarize pending episodes into the wiki
+uv run podmind ingest 12
 ```
 
 The **transcript cascade** tries five tiers in order, cheapest first, and stops at the first hit:
@@ -127,53 +120,39 @@ The **transcript cascade** tries five tiers in order, cheapest first, and stops 
 PODMIND_DATA_ROOT=/Users/you/my-podmind-vault ./scripts/install_launchd.sh
 ```
 
-This renders and loads two launchd jobs: a **daily 04:00 pipeline** (Pocket Casts pull → YouTube history pull → transcript cascade → LLM ingest → stats) and a long-lived **whisper loop** that drains the transcription backlog only while the Mac is on AC power.
+Loads a daily 04:00 pipeline + an AC-gated whisper loop. Details in
+[docs/OPERATIONS.md](docs/OPERATIONS.md#automation-macos-launchd).
 
 ## Pocket Casts disclaimer
 
 Pocket Casts has no public API. podmind talks to the same private endpoints the Pocket Casts web player uses — like other open-source Pocket Casts clients. It can break without notice, and you should consider whether that's acceptable use of your account.
 
-## Cost discipline
+## Cost
 
-All numbers below are **measured**, not estimated (telemetry is written to `/tmp/podmind-results/_cost.json` after every run):
+~**$0.015/episode** on the default DeepSeek path (measured); a 100-episode run ≈
+$1.50. Whisper transcription is free locally on Apple Silicon. Full breakdown in
+[docs/OPERATIONS.md](docs/OPERATIONS.md#cost-discipline).
 
-- **~$0.015/episode** fresh on DeepSeek V4 — but ~92% of that is transcript input tokens, so cost scales with transcript length, not episode count. Rule of thumb: **~$0.0675 per 1000 KB of transcript**.
-- The 400 KB transcript input cap bounds worst-case per-episode cost at **~$0.027**.
-- A 100-episode backlog run lands around **$1.50**.
-- Whisper transcription is **free** locally on Apple Silicon (~5–7 min per 60-min episode on an M1).
-- **Transcripts are stored compressed** (`transcript.vtt.xz`, xz/lzma — ~6–7×
-  smaller) by default; the plain-text `transcript.md` the summarizer reads stays
-  uncompressed and greppable. Disable with `PODMIND_COMPRESS_TRANSCRIPTS=0`.
-  Migrate an existing vault with `./bin/compress_transcripts.py` (`--dry-run`
-  to preview, `--decompress` to reverse).
-- Free transcript tiers (RSS, podcast-index, YouTube subs) are always tried before whisper.
+## Commands
 
-One non-obvious cost of cheap hosted models: they can quietly soften politically sensitive framings. `bin/sensitivity_audit.py` scans transcripts for China-PRC sensitive markers (Tiananmen, Xinjiang, Taiwan, CCP-critique, …) and flags episodes for optional re-summarization with a stronger model — think of it as **auditing your cheap LLM provider for censorship drift**.
+One CLI, `podmind <command>` (run `podmind <command> --help` for flags):
 
-## Tool reference
-
-| Path | What it does |
+| Command | What it does |
 |---|---|
-| `podmind/sync.py` | Pocket Casts pull + transcript cascade driver |
-| `podmind/transcript.py` | Cascade: rss → publisher → podcast-index → youtube → whisper |
-| `podmind/youtube.py` | Google Takeout watch-history ingest |
-| `podmind/youtube_history.py` | Daily yt-dlp pull from youtube.com/feed/history |
-| `podmind/refresh_badges.py` | Re-derive listened-state badges on wiki pages |
-| `podmind/llm.py` | Provider-agnostic LLM + embeddings client |
-| `bin/ingest_run.py` | Full ingest driver: prep → LLM summarize → finalize, one command |
-| `bin/summarize.py` | LLM summarization over a dispatch file (called by ingest_run) |
-| `bin/tick_prep.py` | Emit next-N pending episodes as a JSON dispatch table; auto-quarantine yt-dlp duplicates |
-| `bin/tick_finalize.py` | Write episode pages + stubs, regenerate `wiki/index.md`, append log entry |
-| `bin/build_stats.py` | Regenerate `wiki/stats.md` + analytics PNGs |
-| `bin/lint.py` | Wiki health pass: near-dup topics, broken cross-links, stale badges |
-| `bin/embed_all.py` / `bin/query.py` | Embeddings + semantic query over the wiki |
-| `bin/daily_digest.py` | 3-minute digest of what you listened to recently |
-| `bin/merge_topic_dups.py` / `bin/merge_topic_ai.py` | Near-duplicate topic merge (heuristic / LLM-judged) |
-| `bin/sensitivity_audit.py` | Flag episodes where a cheap provider may have softened sensitive framing |
-| `bin/yt_prefilter.py` | Quarantine YouTube episodes not worth transcribing |
-| `bin/preflight.sh` | Verify the launchd toolchain before it next fires (~47 checks) |
-| `scripts/demo.sh` | Zero-key demo: real pipeline over 3 bundled synthetic episodes |
-| `scripts/install_launchd.sh` | Render + load the macOS launchd jobs for unattended operation |
+| `podmind ingest [N]` | summarize pending episodes into the wiki |
+| `podmind query <q>` | semantic query, filed back as a synthesis page |
+| `podmind lint` | wiki health pass (near-dup topics, broken links, stale badges) |
+| `podmind sync` | pull Pocket Casts state + run the transcript cascade |
+| `podmind transcript` | transcript cascade only |
+| `podmind digest` | a short digest of recent listening |
+| `podmind stats` | regenerate `wiki/stats.md` + charts |
+| `podmind embed` | build/refresh the semantic-search cache |
+| `podmind compress-transcripts` | migrate VTT transcripts to/from xz |
+| `podmind refresh-badges` | re-derive listened-state badges |
+| `podmind demo` | the zero-key demo |
+
+Operator detail — launchd automation, the provider matrix, cost deep-dive — is in
+[docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## The schema layer
 

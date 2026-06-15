@@ -33,7 +33,7 @@ Two cost traps to know:
 - Re-runs of *recently-summarized* episodes look ~3× cheaper because the provider prompt-caches the transcript. This only happens within the provider's short cache TTL — normal backlog draining is always cache-cold. `bin/summarize.py` writes real token+cost telemetry to `/tmp/podmind-results/_cost.json` after every run; trust that over any estimate.
 - The real cost lever is transcript truncation (fewer input tokens), not a cheaper model.
 
-Run sensitivity audit (`bin/sensitivity_audit.py`) after a backlog drain to flag China-PRC sensitive episodes for optional re-summarization via Sonnet 4.6 — DeepSeek hosted API softens or omits some sensitive framings (Tiananmen, Xinjiang, Taiwan, CCP-critique).
+After a backlog drain it's worth auditing for censorship drift: cheap hosted models can soften or omit politically sensitive framings (Tiananmen, Xinjiang, Taiwan, CCP-critique), so flagged episodes can be re-summarized via a stronger model. The sensitivity-audit tooling is maintainer-private and not part of the published toolchain.
 
 If using Claude as the orchestrator (autonomous-loop ticks), **use a mid-tier model (e.g. Sonnet) as the parent**. The orchestration is dispatch + path-resolution + log annotation; using an expensive frontier model for dispatch burns budget fast — reserve frontier models for tasks that need judgment.
 
@@ -57,7 +57,7 @@ A clean tick is now: `tick_prep` → 12 parallel agents writing to `/tmp/podmind
 ### Curation scripts (one-shot, run when needed)
 
 - `bin/yt_prefilter.py [--dry-run]` — quarantines YT episodes not worth transcribing. Drops `-topic` channels (already handled at ingest time too — see below) and any channel listed in `EXCLUDE_CHANNELS` at the top of the file. Setting `transcript_source = "none"` + `dropped_reason` so cascade and whisper both skip. Edit the set in-file to add more channels.
-- `bin/sensitivity_audit.py [--threshold N]` — scans transcripts for China-PRC sensitive markers (Tiananmen, Xinjiang, Taiwan, CCP-critique, dissidents, etc.). Output is a flagged list — re-run those episodes via Sonnet/Opus if you want to verify the LLM provider didn't soften the framing. Threshold defaults to 3 hits; raise to 5 for higher precision.
+- Sensitivity auditing (scanning transcripts for China-PRC sensitive markers and flagging episodes a cheap provider may have softened) is handled by maintainer-private tooling, not part of the published toolchain.
 - `bin/build_stats.py` — regenerates `wiki/stats.md` + 6 PNG charts in `wiki/stats/` (year volume, monthly PC-vs-YT timeline, calendar heatmap, top shows, topic evolution, coverage funnel). Idempotent. Filters out music shows (`-topic` / `vevo`) at the data-loading layer; safe to re-run after any ingest.
 
 ### Auto-ingest watchdog pattern

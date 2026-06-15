@@ -31,11 +31,7 @@ all = [
 ]
 
 [project.scripts]
-podmind-sync = "podmind.sync:main"
-podmind-transcript = "podmind.transcript:main"
-podmind-youtube = "podmind.youtube:main"
-podmind-youtube-history = "podmind.youtube_history:main"
-podmind-refresh-badges = "podmind.refresh_badges:main"
+podmind = "podmind.cli:main"
 
 [tool.uv]
 package = true
