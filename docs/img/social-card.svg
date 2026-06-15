@@ -1,0 +1,73 @@
+<svg width="1280" height="640" viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#7ee787"/>
+    </linearGradient>
+    <style>
+      text { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1280" height="6" fill="url(#accent)"/>
+
+  <!-- wordmark -->
+  <text x="80" y="150" fill="#e6edf3" font-size="92" font-weight="800" letter-spacing="-2">podmind</text>
+  <text x="80" y="208" fill="#7d8590" font-size="30" font-weight="500">a Karpathy-style LLM-built knowledge wiki of everything you listen to</text>
+
+  <!-- in → out flow -->
+  <g transform="translate(80, 300)">
+    <!-- inputs -->
+    <rect x="0" y="0" width="250" height="64" rx="12" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+    <text x="125" y="33" fill="#e6edf3" font-size="22" font-weight="600" text-anchor="middle">Pocket Casts</text>
+    <text x="125" y="54" fill="#7d8590" font-size="16" text-anchor="middle">listening history</text>
+
+    <rect x="0" y="80" width="250" height="64" rx="12" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+    <text x="125" y="113" fill="#e6edf3" font-size="22" font-weight="600" text-anchor="middle">YouTube</text>
+    <text x="125" y="134" fill="#7d8590" font-size="16" text-anchor="middle">watch history</text>
+
+    <!-- arrow -->
+    <text x="300" y="86" fill="#58a6ff" font-size="44" font-weight="700" text-anchor="middle">→</text>
+
+    <!-- engine -->
+    <rect x="340" y="36" width="230" height="72" rx="12" fill="#1f2d1f" stroke="#2ea043" stroke-width="1.5"/>
+    <text x="455" y="70" fill="#7ee787" font-size="21" font-weight="700" text-anchor="middle">LLM pipeline</text>
+    <text x="455" y="93" fill="#7d8590" font-size="15" text-anchor="middle">transcribe · summarize</text>
+
+    <text x="600" y="86" fill="#58a6ff" font-size="44" font-weight="700" text-anchor="middle">→</text>
+
+    <!-- output -->
+    <rect x="640" y="36" width="280" height="72" rx="12" fill="#21262d" stroke="#30363d" stroke-width="1.5"/>
+    <text x="780" y="70" fill="#e6edf3" font-size="21" font-weight="700" text-anchor="middle">Obsidian wiki</text>
+    <text x="780" y="93" fill="#7d8590" font-size="15" text-anchor="middle">episodes · people · topics</text>
+  </g>
+
+  <!-- fact strip -->
+  <g transform="translate(80, 520)" fill="#7d8590" font-size="20">
+    <text x="0" y="0"><tspan fill="#e6edf3" font-weight="700">cross-linked</tspan> markdown</text>
+    <text x="250" y="0"><tspan fill="#e6edf3" font-weight="700">~$0.015</tspan> / episode</text>
+    <text x="500" y="0"><tspan fill="#e6edf3" font-weight="700">any</tspan> OpenAI-compat or Anthropic API</text>
+  </g>
+
+  <text x="80" y="600" fill="#484f58" font-size="20" font-weight="500">github.com/DexMind-AI/podmind · MIT</text>
+
+  <!-- decorative graph nodes, top-right -->
+  <g transform="translate(1010, 150)" opacity="0.9">
+    <line x1="120" y1="60" x2="40" y2="10" stroke="#30363d" stroke-width="2"/>
+    <line x1="120" y1="60" x2="210" y2="30" stroke="#30363d" stroke-width="2"/>
+    <line x1="120" y1="60" x2="60" y2="150" stroke="#30363d" stroke-width="2"/>
+    <line x1="120" y1="60" x2="200" y2="140" stroke="#30363d" stroke-width="2"/>
+    <line x1="40" y1="10" x2="210" y2="30" stroke="#30363d" stroke-width="1.5"/>
+    <line x1="60" y1="150" x2="200" y2="140" stroke="#30363d" stroke-width="1.5"/>
+    <circle cx="120" cy="60" r="16" fill="#58a6ff"/>
+    <circle cx="40" cy="10" r="10" fill="#7ee787"/>
+    <circle cx="210" cy="30" r="10" fill="#7ee787"/>
+    <circle cx="60" cy="150" r="10" fill="#7ee787"/>
+    <circle cx="200" cy="140" r="10" fill="#7ee787"/>
+  </g>
+</svg>
