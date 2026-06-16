@@ -79,6 +79,53 @@ class TestBuildPromptBraceSafety:
         assert "raw_dir: test-show/2026-01-01-test-ep" in prompt
 
 
+# ---------- summarize output-token budget (reasoning-model fix) ----------
+
+class TestMaxOutputTokens:
+    def test_default_budget_is_16000(self):
+        import summarize
+        assert summarize.MAX_OUTPUT_TOKENS == 16000
+
+    def test_env_override(self, monkeypatch):
+        import importlib
+        import summarize
+        monkeypatch.setenv("PODMIND_MAX_OUTPUT_TOKENS", "5000")
+        importlib.reload(summarize)
+        try:
+            assert summarize.MAX_OUTPUT_TOKENS == 5000
+        finally:
+            monkeypatch.delenv("PODMIND_MAX_OUTPUT_TOKENS", raising=False)
+            importlib.reload(summarize)  # restore default for other tests
+
+    def test_process_one_forwards_budget_to_achat(self, tmp_path, monkeypatch):
+        import asyncio
+
+        import summarize
+        from podmind import llm, paths
+
+        d = paths.EPISODES_DIR / "test-show" / "2026-01-01-budget-ep"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "meta.json").write_text(json.dumps({"title": "T", "show": "S", "duration_sec": 60}))
+        (d / "transcript.md").write_text("hello world transcript")
+        monkeypatch.setattr(summarize, "RESULTS", tmp_path)  # don't touch /tmp/podmind-results
+        item = {"raw_dir": "test-show/2026-01-01-budget-ep", "idx": "01",
+                "show_slug": "test-show", "date": "2026-01-01"}
+
+        seen = {}
+
+        class FakeProvider:
+            async def achat(self, client, prompt, **kwargs):
+                seen["max_tokens"] = kwargs.get("max_tokens")
+                return '{"hook": "x", "takeaways": []}', llm.Usage(10, 0, 5)
+
+        async def go():
+            return await summarize.process_one(None, FakeProvider(), item, asyncio.Semaphore(1))
+
+        idx, ok, _usage = asyncio.run(go())
+        assert ok is True
+        assert seen["max_tokens"] == summarize.MAX_OUTPUT_TOKENS == 16000
+
+
 # ---------- tick_finalize.to_episode resilience ----------
 
 class TestToEpisodeResilience:

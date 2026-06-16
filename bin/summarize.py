@@ -8,6 +8,7 @@ Usage: ./bin/summarize.py /tmp/tick.json [--concurrency 8]
 import argparse
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -21,6 +22,15 @@ from podmind.llm_json import extract_json
 ROOT = DATA_ROOT
 RESULTS = Path("/tmp/podmind-results")
 RESULTS.mkdir(exist_ok=True)
+
+# Output-token ceiling for the summary call. The structured JSON is only ~1-2k
+# tokens, but reasoning models (MiniMax M-series, Claude with thinking) spend a
+# large, variable amount of the budget on a <think> block first — a 4000 cap
+# truncated the JSON for ~25-50% of episodes on MiniMax-M3 (some needed >9000).
+# This is a ceiling, not a target: non-thinking models (DeepSeek) still stop at
+# ~1.3k, so the higher cap doesn't change their cost. Override per-vault if
+# needed.
+MAX_OUTPUT_TOKENS = int(os.environ.get("PODMIND_MAX_OUTPUT_TOKENS", "16000"))
 
 PROMPT = """You are extracting a structured summary of a podcast episode for a knowledge wiki.
 
@@ -104,7 +114,7 @@ async def process_one(client: httpx.AsyncClient, provider: llm.LLMProvider, item
     async with sem:
         prompt = build_prompt(item)
         try:
-            content, usage = await provider.achat(client, prompt)
+            content, usage = await provider.achat(client, prompt, max_tokens=MAX_OUTPUT_TOKENS)
         except llm.LLMError as e:
             print(f"  [error] {item['raw_dir']}: {e}", file=sys.stderr)
             return item["idx"], False, llm.Usage()
