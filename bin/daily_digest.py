@@ -39,7 +39,8 @@ from _lib import WIKI_DIR
 
 RESEND_URL = "https://api.resend.com/emails"
 
-def collect_episodes(hours: int = 24, since: str | None = None, max_n: int = 25) -> list[EpisodePage]:
+def collect_episodes(hours: int = 24, since: str | None = None, max_n: int = 25,
+                     links_out: dict[str, str] | None = None) -> list[EpisodePage]:
     """Return EpisodePage objects for the user's most-recent listening activity.
 
     Uses PocketCasts' /user/history which returns episodes ordered by most-recent
@@ -56,7 +57,7 @@ def collect_episodes(hours: int = 24, since: str | None = None, max_n: int = 25)
     """
     already = _previously_digested_slugs(skip=since or datetime.now().strftime("%Y-%m-%d"))
     # Strategy 1: PocketCasts listening history (most accurate)
-    pc_episodes = _from_pocketcasts_history(max_n, already)
+    pc_episodes = _from_pocketcasts_history(max_n, already, links_out)
     if pc_episodes:
         return pc_episodes
     # Strategy 2: fallback to pub_date window
@@ -81,7 +82,8 @@ def _previously_digested_slugs(skip: str) -> set[str]:
     return slugs
 
 
-def _from_pocketcasts_history(max_n: int, already: set[str]) -> list[EpisodePage]:
+def _from_pocketcasts_history(max_n: int, already: set[str],
+                              links_out: dict[str, str] | None = None) -> list[EpisodePage]:
     """Map PC /user/history → wiki episode pages. Empty list if PC unavailable."""
     try:
         from podmind import pocketcasts
@@ -141,6 +143,9 @@ def _from_pocketcasts_history(max_n: int, already: set[str]) -> list[EpisodePage
         if status == 1 and played == 0:
             continue
         out.append(EpisodePage.from_file(page))
+        ep_uuid = h.get("uuid")
+        if links_out is not None and ep_uuid:
+            links_out[page.stem] = f"https://pca.st/episode/{ep_uuid}"
         if len(out) >= max_n:
             break
     return out
@@ -191,30 +196,17 @@ def file_digest(date_str: str, content: str, n_episodes: int, hours: int) -> Pat
     return out
 
 
-def send_email(to: str, subject: str, markdown_body: str) -> bool:
+def send_email(to: str, subject: str, html_body: str) -> bool:
     api_key = os.environ.get("RESEND_API_KEY")
     from_addr = os.environ.get("EMAIL_FROM")
     if not api_key or not from_addr:
         print("RESEND_API_KEY or EMAIL_FROM not set; skipping email.", file=sys.stderr)
         return False
-    # Crude markdown→HTML so the email is readable
-    html = (
-        markdown_body
-        .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    )
-    html = re.sub(r"^## (.+)$", r"<h2>\1</h2>", html, flags=re.M)
-    html = re.sub(r"^# (.+)$", r"<h1>\1</h1>", html, flags=re.M)
-    html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
-    html = re.sub(r"^- (.+)$", r"<li>\1</li>", html, flags=re.M)
-    html = re.sub(r"(<li>.*?</li>(\s*<li>.*?</li>)*)", r"<ul>\1</ul>", html, flags=re.S)
-    html = html.replace("\n\n", "</p><p>")
-    html = f"<div style='font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:640px;line-height:1.55'><p>{html}</p></div>"
-
     try:
         r = httpx.post(
             RESEND_URL,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"from": from_addr, "to": [to], "subject": subject, "html": html},
+            json={"from": from_addr, "to": [to], "subject": subject, "html": html_body},
             timeout=30,
         )
     except httpx.HTTPError as e:
@@ -236,7 +228,8 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true", help="don't file or email")
     args = ap.parse_args()
 
-    eps = collect_episodes(hours=args.hours, since=args.since)
+    pc_links: dict[str, str] = {}
+    eps = collect_episodes(hours=args.hours, since=args.since, links_out=pc_links)
     if not eps:
         print(f"No played episodes in the last {args.hours}h.")
         return
@@ -269,7 +262,12 @@ def main() -> None:
     print(f"  → {len(threads)} threads + {len(uncat)} uncategorized")
 
     date_str = (args.since or datetime.now().strftime("%Y-%m-%d"))
-    window_label = f"the last {args.hours}h" if args.hours != 24 else "the last 24h"
+    if args.since:
+        window_label = f"since {args.since}"
+    elif args.hours != 24:
+        window_label = f"the last {args.hours}h"
+    else:
+        window_label = "the last 24h"
     lookup = {p.stem: ep for p, ep in pairs}
     content = format_threads_md(
         threads, uncat,
@@ -285,7 +283,22 @@ def main() -> None:
         print(f"→ filed {out}")
 
     if args.email and not args.dry_run:
-        ok = send_email(args.email, f"Podcast digest — {date_str}", content)
+        # lazy: keeps cron/CLI startup light (same pattern as threads/frontmatter above)
+        from podmind.digest_email import render_email_html
+        subject = f"Threads — {date_str}"
+        if threads:
+            top = max(threads, key=lambda t: len(t.episode_slugs))
+            n = len(top.episode_slugs)
+            subject = f"{top.name} · {n} episode{'s' if n != 1 else ''} ({date_str})"
+        html_body = render_email_html(
+            threads, uncat,
+            date_str=date_str,
+            window_label=window_label,
+            episode_lookup=lookup,
+            vault_name=os.environ.get("OBSIDIAN_VAULT", "podcast-wiki"),
+            source_overrides=pc_links,
+        )
+        ok = send_email(args.email, subject, html_body)
         if ok:
             print(f"→ emailed to {args.email}")
 
