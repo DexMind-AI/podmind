@@ -1,5 +1,9 @@
 # podmind
 
+<p align="center">
+  <img src="docs/img/banner.png" alt="podmind — always remember everything you ever heard. Listen → Ingest → Summarize → Link → Ask, plus the AI minds it remembers ranked by how often you heard them." width="880">
+</p>
+
 ![ci](https://github.com/DexMind-AI/podmind/actions/workflows/ci.yml/badge.svg)
 
 A [Karpathy-style LLM-built knowledge wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) of everything you actually listen to.
