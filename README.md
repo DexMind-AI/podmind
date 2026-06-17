@@ -4,13 +4,67 @@
   <img src="docs/img/banner.png" alt="podmind — always remember everything you ever heard. Listen → Ingest → Summarize → Link → Ask, plus the AI minds it remembers ranked by how often you heard them." width="880">
 </p>
 
+<p align="center"><em>Always remember everything you ever heard.</em></p>
+
 ![ci](https://github.com/DexMind-AI/podmind/actions/workflows/ci.yml/badge.svg)
 
-A [Karpathy-style LLM-built knowledge wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) of everything you actually listen to.
+**You've listened to thousands of hours of podcasts. Quick — what did the last one actually say?**
 
-Pocket Casts listening history and YouTube watch history go in; an Obsidian-compatible, cross-linked markdown wiki comes out — one page per episode, plus people, topics, and show pages, listening-state badges on every citation, and an analytics layer over your listening history. The wiki compounds: every ingest and every query leaves more cross-links behind.
+podmind is the memory you wish your ears had. Point it at your Pocket Casts and YouTube history and it quietly builds a [Karpathy-style LLM knowledge wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) of everything you've *actually* heard — one cross-linked markdown page per episode, plus people, topics, and show pages, with a listening-state badge on every citation so you can tell what you truly listened to from what's just been sitting in your queue.
+
+Listening history goes in; an Obsidian-compatible second brain comes out. And it compounds: every ingest and every query leaves more cross-links behind.
 
 ![Obsidian graph view of the bundled demo vault — three episodes cross-linked through their people and topics](docs/img/wiki-graph.png)
+
+## Why podmind
+
+- **You already did the listening — keep the knowledge.** Hours of audio leave almost no durable trace. podmind turns listening you've *already done* into something searchable.
+- **Answers from your sources, not the web.** `podmind query "..."` synthesizes a cited answer from the episodes you actually heard — not a generic chatbot guess.
+- **Plain markdown you own forever.** Obsidian-compatible files on your disk. Greppable, portable, and they outlive every SaaS knowledge tool.
+- **It builds itself.** A daily job pulls new listens, transcribes, summarizes, and cross-links — hands-off while you sleep.
+- **Cheap and local-first.** ~$0.015/episode for summaries; transcription runs free on Apple Silicon.
+
+## What it produces
+
+Run podmind over an episode and you get a page like this — structured takeaways, quotes with timestamps, and real cross-links, topped with a listening-state badge (`🎧` heard · `▶ 38%` in progress · `⚪` unheard):
+
+```markdown
+---
+show: "Signals & Noise"
+date: 2026-05-16
+guests: ["Daniel Voss"]
+---
+▶ 38% [[shows/signals-and-noise]] — Daniel Voss on cost-per-token engineering:
+your LLM bill is input tokens, and the cheapest model that emits valid JSON wins.
+
+## Key takeaways
+- Summarization cost is dominated by input tokens (~90%), so the bill scales
+  with transcript length, not model intelligence.
+- Three levers — truncation, prompt caching, and model routing — cut costs by
+  two thirds before any prompt tuning.
+
+## Notable quotes
+> Your bill is determined by how much you make the model read, not by how smart
+> it is. — Daniel Voss (00:04:10)
+
+## Cross-links
+- People: [[people/maya-brennan]], [[people/daniel-voss]]
+- Topics: [[topics/llm-cost-engineering]], [[topics/summarization-pipelines]]
+```
+
+Every `[[link]]` resolves to a real page. Topic and people pages gather every episode that touched them — so *"what have I actually heard about LLM costs?"* is a grep away: filter a topic page's citations for `🎧` and you get exactly the claims you've personally listened to, not just subscribed to.
+
+## What it looks like at scale
+
+One real vault, built passively over ~10 years of listening:
+
+| | |
+|---|---|
+| **14,789** episodes tracked | **8,789** hours of audio |
+| **1,720** shows & channels | **9,376** episodes distilled into the wiki |
+| **19,467** people mapped | **30,589** topics — every one cross-linked |
+
+The busiest threads run from Bitcoin (562 citations) to AI agents (260) to geopolitics — the wiki maps whatever you actually feed it.
 
 ## How it works
 
@@ -33,8 +87,6 @@ flowchart LR
     WIKI --> OBS[Obsidian / any<br/>markdown editor]
     WIKI --> STATS[stats.md + charts]
 ```
-
-Every episode citation in the wiki carries a **listening-state badge** derived from the raw metadata: `🎧` fully listened, `▶ 42%` in progress, `⚪` not yet heard. That makes *"what have I actually heard about X?"* answerable with a grep — filter topic-page citations for `🎧` and you get exactly the claims you've personally listened to, not just subscribed to.
 
 ## Try it in 60 seconds (no accounts needed)
 
@@ -92,10 +144,7 @@ chmod 600 ~/.config/podmind/secrets.json
 
 ### LLM provider
 
-**Default is DeepSeek — put one key in `secrets.json` and you're done.** podmind
-also speaks OpenAI, OpenRouter, Ollama, and Anthropic; see
-[docs/OPERATIONS.md](docs/OPERATIONS.md#llm-provider-configuration) for the
-provider matrix and embeddings config.
+**Default is DeepSeek — put one key in `secrets.json` and you're done.** podmind also speaks OpenAI, OpenRouter, Ollama, and Anthropic; see [docs/OPERATIONS.md](docs/OPERATIONS.md#llm-provider-configuration) for the provider matrix and embeddings config.
 
 ### First sync
 
@@ -124,8 +173,7 @@ The **transcript cascade** tries five tiers in order, cheapest first, and stops 
 PODMIND_DATA_ROOT=/Users/you/my-podmind-vault ./scripts/install_launchd.sh
 ```
 
-Loads a daily 04:00 pipeline + an AC-gated whisper loop. Details in
-[docs/OPERATIONS.md](docs/OPERATIONS.md#automation-macos-launchd).
+Loads a daily 04:00 pipeline + an AC-gated whisper loop. Details in [docs/OPERATIONS.md](docs/OPERATIONS.md#automation-macos-launchd).
 
 ## Pocket Casts disclaimer
 
@@ -133,9 +181,7 @@ Pocket Casts has no public API. podmind talks to the same private endpoints the 
 
 ## Cost
 
-~**$0.015/episode** on the default DeepSeek path (measured); a 100-episode run ≈
-$1.50. Whisper transcription is free locally on Apple Silicon. Full breakdown in
-[docs/OPERATIONS.md](docs/OPERATIONS.md#cost-discipline).
+~**$0.015/episode** on the default DeepSeek path (measured); a 100-episode run ≈ $1.50. Whisper transcription is free locally on Apple Silicon. Full breakdown in [docs/OPERATIONS.md](docs/OPERATIONS.md#cost-discipline).
 
 ## Commands
 
@@ -155,8 +201,7 @@ One CLI, `podmind <command>` (run `podmind <command> --help` for flags):
 | `podmind refresh-badges` | re-derive listened-state badges |
 | `podmind demo` | the zero-key demo |
 
-Operator detail — launchd automation, the provider matrix, cost deep-dive — is in
-[docs/OPERATIONS.md](docs/OPERATIONS.md).
+Operator detail — launchd automation, the provider matrix, cost deep-dive — is in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## The schema layer
 
