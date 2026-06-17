@@ -125,7 +125,7 @@ if [ "${PENDING_COUNT:-0}" -gt 0 ]; then
   INGEST_LOG="$HOME/Library/Logs/podcast-wiki-ingest.log"
   # Hard cap at 100/day ≈ $1.50/day at measured DS V4 cost. (The previous
   # Claude-Opus orchestrator burned the weekly Max-20x allowance in ~4 days;
-  # see CLAUDE.md "Model selection (cost discipline)".)
+  # see docs/AGENTS-vault.md "Model selection (cost discipline)".)
   INGEST_CAP=100
   N=$((PENDING_COUNT < INGEST_CAP ? PENDING_COUNT : INGEST_CAP))
   echo "=== $TS ingest_run ingest (pending=$PENDING_COUNT, processing=$N) ===" >> "$INGEST_LOG"
@@ -138,22 +138,33 @@ if [ "${PENDING_COUNT:-0}" -gt 0 ]; then
   echo >> "$INGEST_LOG"
 fi
 
-# ---- Stage 5: regenerate stats page ----
-# Invoke as a script so the shebang `#!/usr/bin/env -S uv run --with matplotlib
-# --with pandas python` fires — `uv run python <path>` would bypass it and the
-# import would fail. Caught by preflight 2026-05-13.
-"$PODMIND_REPO/bin/build_stats.py" >> "$DAILY_LOG" 2>&1 \
-  || { echo "build_stats errored" >> "$DAILY_LOG"; FAILED_STAGES="$FAILED_STAGES build_stats"; }
-
-# ---- Stage 6: refresh embedding cache (incremental) ----
-# Key resolution is handled inside embed_all.py via resolve_embed_config()
-# (PODMIND_EMBED_API_KEY > secrets embed_api_key > legacy OPENROUTER_API_KEY).
-# A missing key raises a clear error which lands in the guard below.
+# ---- Stage 5: refresh embedding cache (incremental) ----
+# Runs BEFORE curation so enrich_cross_links has vectors for tonight's new
+# episodes. Key resolution is handled inside embed_all.py via
+# resolve_embed_config() (PODMIND_EMBED_API_KEY > secrets embed_api_key >
+# legacy OPENROUTER_API_KEY). A missing key raises a clear error caught below.
 uv run python "$PODMIND_REPO/bin/embed_all.py" \
   >> "$DAILY_LOG" 2>&1 \
   || { echo "embed_all errored" >> "$DAILY_LOG"; FAILED_STAGES="$FAILED_STAGES embed_all"; }
 
-# ---- Stage 7: daily digest ----
+# ---- Stage 6: wiki curation (incremental, unattended) ----
+# Enrich cross-links, git-checkpoint the vault as a restore point, then repair
+# frontmatter, AI fuzzy-merge near-dup topics (scoped to recent), and lint.
+# Destructive steps self-abort if the checkpoint commit fails. A bad merge is
+# revertable with `git -C $PODMIND_DATA_ROOT reset --hard <sha>`. See bin/curate.py.
+uv run python "$PODMIND_REPO/bin/curate.py" nightly --recent 100 \
+  >> "$DAILY_LOG" 2>&1 \
+  || { echo "curate errored" >> "$DAILY_LOG"; FAILED_STAGES="$FAILED_STAGES curate"; }
+
+# ---- Stage 7: regenerate stats page ----
+# Invoke as a script so the shebang `#!/usr/bin/env -S uv run --with matplotlib
+# --with pandas python` fires — `uv run python <path>` would bypass it and the
+# import would fail. Caught by preflight 2026-05-13. Runs after curation so
+# stats reflect the post-merge topic set.
+"$PODMIND_REPO/bin/build_stats.py" >> "$DAILY_LOG" 2>&1 \
+  || { echo "build_stats errored" >> "$DAILY_LOG"; FAILED_STAGES="$FAILED_STAGES build_stats"; }
+
+# ---- Stage 8: daily digest ----
 # zsh does NOT auto-split unquoted variables; pass --email via an array.
 email_args=()
 if [ -n "${PODCAST_DIGEST_TO:-}" ]; then
@@ -162,6 +173,7 @@ fi
 uv run python "$PODMIND_REPO/bin/daily_digest.py" --hours 24 "${email_args[@]}" \
   >> "$DAILY_LOG" 2>&1 \
   || { echo "daily_digest errored" >> "$DAILY_LOG"; FAILED_STAGES="$FAILED_STAGES daily_digest"; }
+
 
 # ---- Failure alert ----
 # If anything failed, email a one-liner via Resend (same creds the digest

@@ -6,7 +6,7 @@ Two modes:
   synthesize    — additionally call the configured LLM provider to write a synthesis
                   page to `$WIKI/synthesis/<slug>.md` and link it from index.md
 
-Foundation for the `query` write-path in CLAUDE-vault.md — Karpathy's pattern
+Foundation for the `query` write-path in AGENTS-vault.md — Karpathy's pattern
 of "every non-trivial query files an artefact back into the wiki."
 
 Usage:

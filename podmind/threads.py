@@ -111,7 +111,7 @@ class Thread:
 def _badge_for(ep: EpisodePage, duration_sec: int = 0) -> str:
     """Listened-state badge: 🎧 listened, ▶ N% in progress, ⚪ unplayed.
 
-    Matches the convention in CLAUDE.md and `refresh_badges.badge_for`.
+    Matches the convention in docs/AGENTS-vault.md and `refresh_badges.badge_for`.
     Duration is optional — if present and we have played_up_to, compute %.
     """
     if ep.listened:

@@ -84,7 +84,7 @@ def first_body_line(body: str) -> str:
 class EpisodePage:
     """Typed view of a wiki episode page's frontmatter + body summary.
 
-    Fields mirror the schema documented in CLAUDE-vault.md. Missing fields
+    Fields mirror the schema documented in AGENTS-vault.md. Missing fields
     fall back to safe defaults; check `raw_dir` for presence (it's the only
     truly required field for the pipeline).
     """

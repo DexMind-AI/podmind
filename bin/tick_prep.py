@@ -53,11 +53,19 @@ def load_ingested() -> tuple[set[str], dict[str, str]]:
 
 
 def main() -> None:
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 12
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("n", nargs="?", type=int, default=12)
+    ap.add_argument("--only", help="comma-separated raw_dirs to restrict to")
+    args = ap.parse_args()
+    n = args.n
+    only = set(args.only.split(",")) if args.only else None
     ingested, ingested_guids = load_ingested()
     candidates = []
     for m in (ROOT / "raw/episodes").glob("*/*/meta.json"):
         rd = f"{m.parent.parent.name}/{m.parent.name}"
+        if only is not None and rd not in only:
+            continue
         if rd in ingested:
             continue
         try:
@@ -117,7 +125,7 @@ def main() -> None:
         seen_hash[h] = (date, rd)
         kept.append((date, rd, size))
 
-    top = kept[:n]
+    top = kept if only is not None else kept[:n]
     out = {
         "pending_total": len(kept),
         "quarantined_this_run": [{"rd": rd, "dup_of": ref, "reason": reason} for rd, ref, reason in quarantined],

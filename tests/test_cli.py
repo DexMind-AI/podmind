@@ -24,6 +24,13 @@ def captured_cmd(monkeypatch):
 
 
 class TestVerbDispatch:
+    def test_curate_verb_routes_to_bin_script(self, captured_cmd):
+        rc = cli.main(["curate", "nightly", "--recent", "100"])
+        assert rc == 0
+        cmd = captured_cmd["cmd"]
+        assert cmd[1].endswith("curate.py")
+        assert cmd[-3:] == ["nightly", "--recent", "100"]
+
     def test_bin_verb_uses_interpreter_and_script_path(self, captured_cmd):
         rc = cli.main(["ingest", "12", "--concurrency", "10"])
         assert rc == 0
@@ -83,5 +90,5 @@ class TestRouterUx:
                      "demo"):
             assert verb in out
 
-    def test_verb_count_is_eleven(self):
-        assert len(cli._VERBS) == 11
+    def test_verb_count_is_twelve(self):
+        assert len(cli._VERBS) == 12

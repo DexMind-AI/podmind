@@ -2,6 +2,8 @@
 
 You are the maintainer of an LLM-built knowledge wiki of the user's podcast subscriptions and YouTube watch history. The pattern is Karpathy's LLM-wiki applied to two streams of long-form content the user actually consumes — Pocket Casts listening history and broad YouTube watch history (everything watched, minus shorts, music, and videos under 5 minutes).
 
+> **This is the canonical, agent-agnostic source of truth for the wiki-maintenance protocol.** Any coding agent — Claude Code, Codex, Gemini CLI, Hermes — follows it. A running vault should **point to this file rather than fork it**: place a thin `AGENTS.md` in the vault root that imports/reads this doc and carries only vault-private overrides, with tool-specific `CLAUDE.md` / `GEMINI.md` shims alongside (`@AGENTS.md`). Don't hand-maintain a second full copy — edit *here*. Where this file says "dispatch parallel agents," do so if your harness supports subagents; otherwise process the batch sequentially — the result is identical.
+
 ## ⚠ Changing the engine while in the air
 
 This vault (`$PODMIND_DATA_ROOT`) depends on the `podmind` package at the code repo path (https://github.com/DexMind-AI/podmind), installed editable via `uv.sources`. Edits to the package take effect **immediately** because there's no rebuild step.
@@ -35,24 +37,22 @@ Two cost traps to know:
 
 After a backlog drain it's worth auditing for censorship drift: cheap hosted models can soften or omit politically sensitive framings (Tiananmen, Xinjiang, Taiwan, CCP-critique), so flagged episodes can be re-summarized via a stronger model. The sensitivity-audit tooling is maintainer-private and not part of the published toolchain.
 
-If using Claude as the orchestrator (autonomous-loop ticks), **use a mid-tier model (e.g. Sonnet) as the parent**. The orchestration is dispatch + path-resolution + log annotation; using an expensive frontier model for dispatch burns budget fast — reserve frontier models for tasks that need judgment.
-
-Reserve a **frontier model (e.g. Opus)** explicitly for:
+**Orchestrator vs. summarizer are two different model budgets.** The *summarizer* (transcript → JSON) is the configured pipeline provider above — cheap, runs unattended. The *orchestrator* is whatever agent reads this file and dispatches the work; pick the cheapest model that handles dispatch + path-resolution + log annotation, and step up to a stronger model only for judgment-heavy steps:
 - Lint passes that require schema-drift judgment.
 - Synthesis writes (`query` write-path) that pull in many cross-references.
-- CLAUDE.md amendments / schema co-evolution.
+- Schema amendments (this vault-instructions file) / schema co-evolution.
 - One-off debugging where the cause is non-obvious from logs.
 
-Subagents stay on Haiku (transcript <150KB) or Sonnet (≥150KB) — that split is in `bin/tick_prep.py`.
+The transcript-size split that routes summary subagents to a smaller vs. larger model lives in `bin/tick_prep.py`. Exact per-harness model choices (which model is the parent, which the subagents) belong in that harness's shim (e.g. a vault-root `CLAUDE.md`), not in this agnostic file.
 
 ## Per-tick orchestration scripts
 
 To keep parent context small (cache-friendly) and reduce conversation back-and-forth:
 
-- `bin/tick_prep.py [N]` — emits next N pending listened episodes as a JSON dispatch table; transparently quarantines byte-identical yt-dlp duplicates among pending. Use the `dispatch` array directly to spawn parallel summary agents.
+- `bin/tick_prep.py [N]` — emits next N pending listened episodes as a JSON dispatch table; transparently quarantines byte-identical yt-dlp duplicates among pending. Feed the `dispatch` array to your summary workers (parallel subagents if your harness supports them, otherwise a sequential loop).
 - `bin/tick_finalize.py <batch> [--note "..."] [--corrupt rd:reason ...] [--quarantined-dups rd:dup_of ...]` — takes JSON results from `/tmp/podmind-results/*.json`, writes episode pages, ensures people/topic stubs, updates show pages, regenerates `wiki/index.md` (preserving the Synthesis section), and appends a structured log entry.
 
-A clean tick is now: `tick_prep` → 12 parallel agents writing to `/tmp/podmind-results/{01..12}.json` → `tick_finalize`. Three bash calls total. Drop in any per-tick corruption flagged by an agent via `--corrupt`.
+A clean tick is: `tick_prep` → N summary workers writing to `/tmp/podmind-results/{01..NN}.json` → `tick_finalize`. With a parallel-subagent harness that's three commands total (N=12 is a comfortable fan-out); without one, the middle step is a loop. Drop in any per-tick corruption flagged by a worker via `--corrupt`.
 
 ### Curation scripts (one-shot, run when needed)
 
@@ -137,7 +137,8 @@ $PODMIND_DATA_ROOT/          # the vault — data only, no code
 │   ├── people/             # Hosts, guests, recurring figures
 │   ├── topics/             # Cross-cutting concepts
 │   └── synthesis/          # Multi-episode analyses, on request
-└── CLAUDE.md               # This file (your copy, placed in vault root).
+└── AGENTS.md               # This file (your copy, placed in vault root). Tool-specific
+                            # CLAUDE.md / GEMINI.md may sit alongside and import it (@AGENTS.md).
 ```
 
 The podmind code repo (https://github.com/DexMind-AI/podmind) contains:
@@ -325,7 +326,7 @@ The daily.sh cascade runs `--no-whisper` and leaves `transcript_source=null` for
 - `## [date] query` — you write after every user query (trivial or not); records the question, scope of search, gaps surfaced, and any synthesis page filed
 - `## [date] lint` — you write after a lint pass
 - `## [date] refresh-badges` — you write after a badge refresh
-- `## [date] schema` — you write when CLAUDE.md, scripts in `bin/`, or pipeline modules in `podmind/` change in a way future sessions need to know about
+- `## [date] schema` — you write when AGENTS.md (the vault schema), scripts in `bin/`, or pipeline modules in `podmind/` change in a way future sessions need to know about
 - `## [date] cleanup` — you write after physical disk operations (deleting dirs, moving files outside the normal flow)
 - `## [date] yt-prefilter` — written by `bin/yt_prefilter.py` (or you, after running it manually)
 - `## [date] stats` — optional; write when `wiki/stats.md` is regenerated and noteworthy headline numbers shifted
@@ -344,7 +345,7 @@ The daily.sh cascade runs `--no-whisper` and leaves `transcript_source=null` for
 
 This file is the **schema** layer in the three-layer pattern. It's not frozen — it co-evolves with the wiki as you and the user discover what works.
 
-When during any operation you discover that an instruction is missing, ambiguous, or has drifted from the canonical pattern (Karpathy's gist at https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), update CLAUDE.md *in the same session*, log the change under `## [date] query` (or `lint`, whichever fits), and explain the diff to the user. Do not wait to be asked. The schema is the highest-leverage thing in the repo: a one-sentence fix here propagates to every future session.
+When during any operation you discover that an instruction is missing, ambiguous, or has drifted from the canonical pattern (Karpathy's gist at https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f), update this file (`AGENTS.md` in your vault — not the thin `CLAUDE.md`/`GEMINI.md` shims) *in the same session*, log the change under `## [date] query` (or `lint`, whichever fits), and explain the diff to the user. Do not wait to be asked. The schema is the highest-leverage thing in the repo: a one-sentence fix here propagates to every future session.
 
 Examples of session-discovered schema drift worth fixing immediately:
 - A protocol step the agent has been silently skipping (e.g., "offer to file synthesis" → never filed).

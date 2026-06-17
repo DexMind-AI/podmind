@@ -24,15 +24,18 @@ DATA_ROOT = _paths.DATA_ROOT
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("n", nargs="?", type=int, default=12)
+    ap.add_argument("--only", help="comma-separated raw_dirs to ingest (forwarded to tick_prep)")
     ap.add_argument("--batch-name", type=int, help="batch number for log entry; default=auto from log")
     ap.add_argument("--concurrency", type=int, default=8)
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     tick_file = "/tmp/tick.json"
-    print(f"[1/3] tick_prep — finding next {args.n} pending...")
+    tick_cmd = [sys.executable, str(CODE_ROOT / "bin/tick_prep.py")]
+    tick_cmd += ["--only", args.only] if args.only else [str(args.n)]
+    print(f"[1/3] tick_prep — {'targeted ingest' if args.only else f'finding next {args.n} pending'}...")
     with open(tick_file, "w") as f:
-        subprocess.run([sys.executable, str(CODE_ROOT / "bin/tick_prep.py"), str(args.n)], stdout=f, check=True)
+        subprocess.run(tick_cmd, stdout=f, check=True)
     d = json.loads(Path(tick_file).read_text())
     print(f"      pending {d['pending_total']}, auto-quarantined {len(d['quarantined_this_run'])}, dispatching {len(d['dispatch'])}")
     for e in d["dispatch"]:

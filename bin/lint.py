@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run python
-"""lint — surface wiki health issues per CLAUDE.md spec.
+"""lint — surface wiki health issues per docs/AGENTS-vault.md spec.
 
 Checks:
 1. Near-duplicate topic slugs (token-jaccard ≥ 0.7)
@@ -68,6 +68,8 @@ def find_broken_links() -> list[tuple[str, str]]:
     broken: list[tuple[str, str]] = []
     for kind in ("episodes", "people", "topics", "shows"):
         for p in (WIKI_DIR / kind).glob("*.md"):
+            if p.stem.startswith("_"):
+                continue  # templates/meta (e.g. _template) hold placeholder links
             text = p.read_text(errors="ignore")
             for m in re.finditer(r"\[\[((?:episodes|people|topics|shows)/[^\]|]+)(?:\|[^\]]+)?\]\]", text):
                 target = m.group(1)
@@ -76,10 +78,65 @@ def find_broken_links() -> list[tuple[str, str]]:
     return broken
 
 
+def make_stub(target: str, backlinks: list[str]) -> bool:
+    """Create a stub page for a broken-link target if it does not exist.
+
+    `target` is `<kind>/<stem>`. Returns True if a file was created, False if
+    one already existed (never overwrites).
+    """
+    kind, stem = target.split("/", 1)
+    path = WIKI_DIR / kind / f"{stem}.md"
+    if path.exists():
+        return False
+    title = stem.replace("-", " ").title()
+    section = "Episodes" if kind == "shows" else "Citations"
+    lines = [
+        f"# {title}",
+        "",
+        "_Stub auto-created by `lint --fix` to resolve broken cross-links. Grow me._",
+        "",
+        f"## {section}",
+    ]
+    lines += [f"- [[{b}]]" for b in backlinks]
+    lines.append("")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines))
+    return True
+
+
+STUB_NAMESPACES = ("topics", "people", "shows")
+VALID_SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+
+def fix_broken_links(broken: list[tuple[str, str]]) -> tuple[list[str], list[str]]:
+    """Create stubs for broken topic/people/show targets; report episode targets.
+
+    Returns (created_targets, reported_episode_targets). Targets whose stem is
+    not a clean slug (e.g. placeholder `...` / `<show-slug>`) are skipped entirely.
+    """
+    by_target: dict[str, list[str]] = defaultdict(list)
+    for src, target in broken:
+        by_target[target].append(src)
+    created: list[str] = []
+    reported: list[str] = []
+    for target in sorted(by_target):
+        kind, _, stem = target.partition("/")
+        if not VALID_SLUG.fullmatch(stem):
+            continue  # junk target (placeholder/malformed) — never a real page
+        if kind in STUB_NAMESPACES:
+            if make_stub(target, sorted(set(by_target[target]))):
+                created.append(target)
+        else:  # episodes — a missing page is a real gap, never fabricate
+            reported.append(target)
+    return created, reported
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write-log", action="store_true", help="append to wiki/log.md")
     ap.add_argument("--threshold", type=float, default=0.7, help="topic-dup jaccard threshold")
+    ap.add_argument("--fix", action="store_true",
+                    help="create stub pages for broken topic/people/show links")
     args = ap.parse_args()
 
     near_dups = find_near_dup_topics(args.threshold)
@@ -88,6 +145,13 @@ def main() -> None:
     single_topics = sorted([t for t, n in topic_cites.items() if n == 1])
     single_people = sorted([p for p, n in people_cites.items() if n == 1])
     broken = find_broken_links()
+
+    created: list[str] = []
+    reported: list[str] = []
+    if args.fix:
+        created, reported = fix_broken_links(broken)
+        print(f"\nFix: created {len(created)} stub(s); "
+              f"reported {len(reported)} broken episode link(s)")
 
     print(f"=== Lint report — {datetime.now():%Y-%m-%d %H:%M} ===")
     print()
@@ -124,6 +188,17 @@ def main() -> None:
         block.append(f"- broken cross-links: **{len(broken)}** — top targets:")
         for src, target in broken[:10]:
             block.append(f"  - `{src}` → `{target}`")
+        if args.fix:
+            by_kind = Counter(t.split("/", 1)[0] for t in created)
+            block.append(
+                f"- stubs created: **{len(created)}** "
+                f"(topics: {by_kind.get('topics', 0)}, "
+                f"people: {by_kind.get('people', 0)}, "
+                f"shows: {by_kind.get('shows', 0)})")
+            block.append(
+                f"- broken episode links (reported, not fixed): **{len(reported)}**")
+            for t in reported[:10]:
+                block.append(f"  - `{t}`")
         block.append("")
         log.write_text(log.read_text() + "\n".join(block))
         print(f"\n→ appended to {log}")

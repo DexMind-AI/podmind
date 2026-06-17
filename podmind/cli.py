@@ -32,6 +32,8 @@ _VERBS: dict[str, _Verb] = {
                    "semantic query over the wiki, filed back as a synthesis page"),
     "lint": _Verb("bin", "lint.py",
                   "wiki health pass: near-dup topics, broken links, stale badges"),
+    "curate": _Verb("bin", "curate.py",
+                    "wiki health & curation: lint, enrich, merge, nightly"),
     "sync": _Verb("py", "podmind.sync",
                   "pull Pocket Casts state and run the transcript cascade"),
     "transcript": _Verb("py", "podmind.transcript",

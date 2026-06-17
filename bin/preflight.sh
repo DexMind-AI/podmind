@@ -94,7 +94,7 @@ fi
 # (its shebang requests --with matplotlib --with pandas, which `uv run python
 # <path>` would bypass). Caught by this section 2026-05-13.
 sect "bin scripts smoke-test"
-help_scripts=(daily_digest.py ingest_run.py tick_finalize.py embed_all.py summarize.py)
+help_scripts=(daily_digest.py ingest_run.py tick_finalize.py embed_all.py summarize.py curate.py lint.py repair_episode_links.py)
 for s in $help_scripts; do
   if [[ -f "$PODMIND_REPO/bin/$s" ]]; then
     if (cd "$PODMIND_REPO" && PATH="$LAUNCHD_PATH" uv run python "bin/$s" --help >/dev/null 2>&1); then

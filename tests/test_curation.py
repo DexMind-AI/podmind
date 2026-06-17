@@ -91,3 +91,29 @@ class TestExcludeChannels:
         (cfg / "curation.json").write_text(
             '{"exclude_channels": ["yt-some-channel"]}')
         assert curation.load_exclude_channels() == {"yt-some-channel"}
+
+
+# --- merge-candidate incremental scope (Task 1: curate --recent) ---
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent.parent / "bin"))  # bin/ is not a package
+
+
+def test_find_pairs_recent_limits_to_recent_topics(tmp_path, monkeypatch):
+    import merge_topic_dups as mtd
+    topics = tmp_path / "topics"
+    topics.mkdir()
+    for slug in ("iran-nuclear-program", "iran-nuclear-threat", "iran-nuclear-talks"):
+        (topics / f"{slug}.md").write_text("# x\n")
+    monkeypatch.setattr(mtd, "WIKI_DIR", tmp_path)
+
+    import os
+    import time
+    recent_file = topics / "iran-nuclear-talks.md"
+    os.utime(recent_file, (time.time() + 100, time.time() + 100))
+
+    all_pairs = mtd.find_pairs(threshold=0.5)
+    recent_pairs = mtd.find_pairs(threshold=0.5, recent=1)
+
+    assert len(all_pairs) > len(recent_pairs)
+    assert all("iran-nuclear-talks" in (a, b) for a, b, _ in recent_pairs)

@@ -179,7 +179,7 @@ def badge(meta: dict) -> str:
     if meta.get("listened"):
         return "🎧"
     pu = meta.get("played_up_to", 0)
-    # Schema key is duration_sec (CLAUDE.md, pocketcasts.py, youtube.py).
+    # Schema key is duration_sec (docs/AGENTS-vault.md, pocketcasts.py, youtube.py).
     # This read `duration` for months — always 0 — so every page got
     # duration_min: 0 and the ▶ NN% badge never computed. Review 2026-06-12.
     dur = meta.get("duration_sec", 0)
