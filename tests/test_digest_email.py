@@ -187,3 +187,27 @@ def test_source_overrides_none_arg_is_safe():
     html = render_email_html([], ["ep-a"], date_str="d", episode_lookup=eps,
                              meta_loader=loader)  # no source_overrides kwarg
     assert 'href="https://yt/1"' in html
+
+
+def test_youtube_slug_renders_play_badge_not_headphones():
+    eps = {"yt-veritasium-x": make_ep(listened=True)}
+    html = render_email_html([], ["yt-veritasium-x"], date_str="d",
+                             episode_lookup=eps, meta_loader=fake_loader({}))
+    assert "▶️" in html        # red play button for YouTube
+    assert "🎧" not in html     # not the podcast listened badge
+
+
+def test_podcast_slug_keeps_headphones_badge():
+    eps = {"real-vision-x": make_ep(listened=True)}
+    html = render_email_html([], ["real-vision-x"], date_str="d",
+                             episode_lookup=eps, meta_loader=fake_loader({}))
+    assert "🎧" in html
+    assert "▶️" not in html
+
+
+def test_in_progress_podcast_unaffected_by_youtube_badge():
+    eps = {"real-vision-y": make_ep(listened=False, played_up_to=900, duration_min=30)}
+    html = render_email_html([], ["real-vision-y"], date_str="d",
+                             episode_lookup=eps, meta_loader=fake_loader({}))
+    assert "▶ 50%" in html      # plain in-progress badge, distinct from ▶️
+    assert "▶️" not in html

@@ -72,6 +72,15 @@ def _hook_text(ep: EpisodePage | None) -> str:
     return (m.group(1) if m else ep.hook).strip()
 
 
+def _source_badge(slug: str, ep: EpisodePage | None) -> str:
+    """Badge that distinguishes source. YouTube watches (slug `yt-*`, which have
+    no progress signal) get ▶️; podcasts keep the listened-state badge
+    (🎧 listened / ▶ N% in-progress / ⚪ unplayed) from threads._badge_for."""
+    if slug.startswith("yt-"):
+        return "▶️"
+    return _badge_for(ep, ep.duration_min * 60) if ep else "⚪"
+
+
 # Inline styles — email clients strip <style>/<head> and choke on flexbox, so
 # every rule rides on its element and colours are fixed hex (no CSS vars).
 _S_BODY = ("font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
@@ -99,7 +108,7 @@ def _episode_html(slug: str, lookup: dict[str, EpisodePage], vault_name: str,
     """Build the HTML block for a single episode: badge, linked title, sub-line, hook."""
     ep = lookup.get(slug)
     meta = meta_loader(slug, ep)
-    badge = _badge_for(ep, ep.duration_min * 60) if ep else "⚪"
+    badge = _source_badge(slug, ep)
     source = (source_overrides or {}).get(slug) or meta.source_url
     title = escape(meta.title)
     if source:
