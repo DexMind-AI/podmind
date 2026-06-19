@@ -1,16 +1,15 @@
 #!/usr/bin/env -S uv run python
 """Daily digest — a 3-minute read of what you actually listened to.
 
-Pulls episodes with `pub_date` in the last N hours that you've played (PC
-doesn't expose per-listen timestamps, so pub_date is the best available
-proxy for "recently consumed"). Sends hook + key-takeaways for each to
-the configured LLM provider, which synthesizes a structured "best of" digest:
+Unions two sources of recent consumption — PocketCasts listening history and
+a date/watched-at window over the wiki (which surfaces YouTube watches) — then
+sends each episode's hook + key-takeaways to the configured LLM provider, which
+clusters them into narrative threads:
 
-  - Top theme of the day (the one through-line)
-  - 4-6 highlights with episode citations
-  - "If you only read one thing" pick
-  - Names + topics that came up
-  - Gaps / what to listen to next
+  - Narrative threads across the day's episodes (the through-lines)
+  - Per-episode hook with listened-state badge and source link
+  - Uncategorized one-offs that don't fit a thread
+  - People + topics that came up
 
 Writes the digest to `wiki/digests/<date>.md` and optionally emails it
 via Resend. Links from index.md under `## Digests`.
@@ -35,33 +34,35 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import httpx
 
 from podmind.frontmatter import EpisodePage
+from podmind.digest_select import merge_episode_sources
 from _lib import WIKI_DIR
 
 RESEND_URL = "https://api.resend.com/emails"
+DIGEST_MAX_EPISODES = 40
 
-def collect_episodes(hours: int = 24, since: str | None = None, max_n: int = 25,
+def collect_episodes(hours: int = 24, since: str | None = None,
+                     max_n: int = DIGEST_MAX_EPISODES,
                      links_out: dict[str, str] | None = None) -> list[EpisodePage]:
-    """Return EpisodePage objects for the user's most-recent listening activity.
+    """Return EpisodePage objects for the user's recent listening AND watching.
 
-    Uses PocketCasts' /user/history which returns episodes ordered by most-recent
-    interaction — much better than filtering on pub_date, since the user often
-    listens to back-catalogue episodes that wouldn't pass a pub_date window.
+    Unions two passes so the digest reflects everything consumed, not just
+    PocketCasts:
+      - `_from_pocketcasts_history`: PocketCasts /user/history (recency-ordered,
+        real progress; also fills `links_out` with pca.st episode links).
+      - `_from_pub_date_window`: a date/watched-at window over the wiki, which
+        surfaces YouTube watches (`yt-*`) and anything PocketCasts history missed.
 
-    `hours` is interpreted as a soft window applied to the wiki page's own date
-    field (most episodes get listened-to within hours-to-days of their drop).
-    Falls back to pub_date filtering if PC API is unreachable.
-
-    Episodes already cited in any prior digest are excluded — first inclusion
-    wins, subsequent listens are ignored. Prevents the same sticky episode from
-    appearing in days of back-to-back digests.
+    `merge_episode_sources` dedupes by raw_dir (PocketCasts wins, preserving its
+    pca.st link), sorts by date desc, and caps to `max_n`. Episodes already
+    cited in a prior digest are excluded by both passes — first inclusion wins.
     """
     already = _previously_digested_slugs(skip=since or datetime.now().strftime("%Y-%m-%d"))
-    # Strategy 1: PocketCasts listening history (most accurate)
-    pc_episodes = _from_pocketcasts_history(max_n, already, links_out)
-    if pc_episodes:
-        return pc_episodes
-    # Strategy 2: fallback to pub_date window
-    return _from_pub_date_window(hours, since, already)
+    primary = _from_pocketcasts_history(max_n, already, links_out)
+    secondary = _from_pub_date_window(hours, since, already)
+    kept, dropped = merge_episode_sources(primary, secondary, max_n=max_n)
+    if dropped:
+        print(f"  digest: capped to {max_n} episodes (dropped {dropped})", file=sys.stderr)
+    return kept
 
 
 def _previously_digested_slugs(skip: str) -> set[str]:
