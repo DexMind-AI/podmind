@@ -2,7 +2,36 @@
 from __future__ import annotations
 
 from podmind.frontmatter import EpisodePage
-from podmind.digest_select import merge_episode_sources
+from podmind.digest_select import merge_episode_sources, is_engaged
+
+
+def _ep(*, listened=False, played_up_to=0, duration_min=30) -> EpisodePage:
+    return EpisodePage(raw_dir="x/y", date="2026-06-17", show="S",
+                       listened=listened, played_up_to=played_up_to,
+                       duration_min=duration_min, guests=[],
+                       transcript_source="x", body="h", hook="h")
+
+
+def test_is_engaged_listened_true():
+    assert is_engaged(_ep(listened=True, played_up_to=0)) is True  # e.g. YouTube
+
+
+def test_is_engaged_below_50_percent_excluded():
+    # 4 seconds of a 17-min episode → ~0.4%, excluded
+    assert is_engaged(_ep(played_up_to=4, duration_min=17)) is False
+    # 40% played → still excluded
+    assert is_engaged(_ep(played_up_to=int(0.4 * 17 * 60), duration_min=17)) is False
+
+
+def test_is_engaged_at_or_above_50_percent_included():
+    assert is_engaged(_ep(played_up_to=int(0.5 * 17 * 60), duration_min=17)) is True
+    assert is_engaged(_ep(played_up_to=int(0.8 * 30 * 60), duration_min=30)) is True
+
+
+def test_is_engaged_unknown_duration_needs_listened():
+    # No duration to judge a fraction → only `listened` counts
+    assert is_engaged(_ep(played_up_to=600, duration_min=0)) is False
+    assert is_engaged(_ep(listened=True, played_up_to=600, duration_min=0)) is True
 
 
 def make_ep(raw_dir, date="2026-06-17") -> EpisodePage:

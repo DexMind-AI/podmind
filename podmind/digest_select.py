@@ -14,6 +14,22 @@ from __future__ import annotations
 
 from podmind.frontmatter import EpisodePage
 
+# A podcast must be meaningfully consumed to earn a place in the digest —
+# mirrors the vault's "≥50% played = listened" policy. YouTube watches have no
+# progress signal but are written `listened=true`, so they pass on that alone.
+DIGEST_MIN_PLAYED_FRACTION = 0.5
+
+
+def is_engaged(ep: EpisodePage) -> bool:
+    """True if the episode was consumed enough to belong in the digest:
+    marked `listened`, or played to ≥ DIGEST_MIN_PLAYED_FRACTION of its length.
+    A few-seconds tap (a 2% play) is not engagement and is excluded."""
+    if ep.listened:
+        return True
+    if ep.duration_min and ep.played_up_to:
+        return ep.played_up_to >= DIGEST_MIN_PLAYED_FRACTION * ep.duration_min * 60
+    return False
+
 
 def merge_episode_sources(
     primary: list[EpisodePage],

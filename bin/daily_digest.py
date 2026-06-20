@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import httpx
 
 from podmind.frontmatter import EpisodePage
-from podmind.digest_select import merge_episode_sources
+from podmind.digest_select import merge_episode_sources, is_engaged
 from _lib import WIKI_DIR
 
 RESEND_URL = "https://api.resend.com/emails"
@@ -138,12 +138,11 @@ def _from_pocketcasts_history(max_n: int, already: set[str],
         seen.add(page)
         if page.stem in already:
             continue
-        # Only include if actually engaged with
-        played = h.get("playedUpTo", 0) or 0
-        status = h.get("playingStatus", 1)  # 1=unplayed 2=in-progress 3=played
-        if status == 1 and played == 0:
+        # Only include if meaningfully consumed (listened, or ≥50% played).
+        ep = EpisodePage.from_file(page)
+        if not is_engaged(ep):
             continue
-        out.append(EpisodePage.from_file(page))
+        out.append(ep)
         ep_uuid = h.get("uuid")
         if links_out is not None and ep_uuid:
             links_out[page.stem] = f"https://pca.st/episode/{ep_uuid}"
@@ -170,7 +169,7 @@ def _from_pub_date_window(hours: int, since: str | None, already: set[str]) -> l
             continue
         if d < cutoff_date:
             continue
-        if not (ep.listened or ep.played_up_to > 0):
+        if not is_engaged(ep):
             continue
         out.append(ep)
     out.sort(key=lambda e: e.date or "", reverse=True)

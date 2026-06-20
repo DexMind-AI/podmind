@@ -126,7 +126,7 @@ def test_badge_in_progress_percent():
     eps = {"a": make_ep(listened=False, played_up_to=900, duration_min=30)}  # 900/1800 = 50%
     html = render_email_html([], ["a"], date_str="d", episode_lookup=eps,
                              meta_loader=fake_loader({}))
-    assert "▶ 50%" in html
+    assert "🎧 50%" in html      # headphones + percent, distinct from YouTube ▶️
 
 
 def test_badge_unplayed():
@@ -209,5 +209,5 @@ def test_in_progress_podcast_unaffected_by_youtube_badge():
     eps = {"real-vision-y": make_ep(listened=False, played_up_to=900, duration_min=30)}
     html = render_email_html([], ["real-vision-y"], date_str="d",
                              episode_lookup=eps, meta_loader=fake_loader({}))
-    assert "▶ 50%" in html      # plain in-progress badge, distinct from ▶️
-    assert "▶️" not in html
+    assert "🎧 50%" in html      # headphones + percent for in-progress podcast
+    assert "▶️" not in html      # never the YouTube play badge

@@ -346,3 +346,87 @@ class TestSynthesizeThreads:
             chat_fn=bad_chat,
         )
         assert len(threads) == 1
+
+    def test_empty_threads_with_bridges_retries_then_entity_fallback(self):
+        """0 threads despite shared entities → retry once, then entity grouping."""
+        eps = [("a", self._ep()), ("b", self._ep())]
+        empty = json.dumps({"threads": [], "uncategorized": ["a", "b"]})
+        calls = {"n": 0}
+
+        def empty_chat(prompt: str) -> tuple[str, llm.Usage]:
+            calls["n"] += 1
+            return empty, llm.Usage()
+
+        threads, uncat = synthesize_threads(
+            eps, {"elon-musk": ["a", "b"]}, {}, chat_fn=empty_chat,
+        )
+        assert calls["n"] == 2                      # retried once
+        assert len(threads) == 1                    # entity fallback engaged
+        assert threads[0].name == "Elon Musk"
+        assert set(threads[0].episode_slugs) == {"a", "b"}
+
+    def test_empty_threads_without_bridges_returns_empty_no_retry(self):
+        """No shared entities → empty is legitimate; don't retry or fabricate."""
+        eps = [("a", self._ep()), ("b", self._ep())]
+        empty = json.dumps({"threads": [], "uncategorized": ["a", "b"]})
+        calls = {"n": 0}
+
+        def empty_chat(prompt: str) -> tuple[str, llm.Usage]:
+            calls["n"] += 1
+            return empty, llm.Usage()
+
+        threads, uncat = synthesize_threads(eps, {}, {}, chat_fn=empty_chat)
+        assert calls["n"] == 1                      # no retry
+        assert threads == []
+        assert set(uncat) == {"a", "b"}
+
+
+# ---------- regression: badge + fallback-copy hygiene (2026-06-20) ----------
+
+def _badge_ep(*, listened=False, played_up_to=0, duration_min=0):
+    return EpisodePage(raw_dir="x/y", date="2026-01-01", show=None,
+                       listened=listened, played_up_to=played_up_to,
+                       duration_min=duration_min, guests=[],
+                       transcript_source=None, body="", hook="")
+
+
+def test_badge_for_negligible_progress_shows_zero_percent():
+    # 4 seconds of a 17-min episode → "🎧 0%" (not fully listened → show the %),
+    # using headphones (not ▶) so it doesn't read as the YouTube ▶️ badge.
+    from podmind.threads import _badge_for
+    assert _badge_for(_badge_ep(played_up_to=4, duration_min=17), 17 * 60) == "🎧 0%"
+
+
+def test_badge_for_real_progress_shows_percent():
+    from podmind.threads import _badge_for
+    assert _badge_for(_badge_ep(played_up_to=153, duration_min=17), 17 * 60) == "🎧 15%"
+
+
+def test_badge_for_unplayed_is_circle():
+    from podmind.threads import _badge_for
+    assert _badge_for(_badge_ep(played_up_to=0, duration_min=17), 17 * 60) == "⚪"
+
+
+def test_entity_name_dekebabs():
+    from podmind.threads_llm import _entity_name
+    assert _entity_name("elon-musk") == "Elon Musk"
+
+
+def test_fallback_copy_has_no_internal_leakage():
+    # LLM failure must not leak internals into the reader-facing digest.
+    eps = [("a", _badge_ep(listened=True)), ("b", _badge_ep(listened=True)),
+           ("c", _badge_ep(listened=True))]
+
+    def failing_chat(prompt: str) -> tuple[str, llm.Usage]:
+        raise llm.LLMError("no JSON object in LLM response")
+
+    threads, uncat = synthesize_threads(
+        eps, {"elon-musk": ["a", "b"]}, {}, chat_fn=failing_chat,
+    )
+    assert len(threads) == 1
+    t = threads[0]
+    assert t.name == "Elon Musk"
+    assert "Person:" not in t.name
+    assert t.summary == "Episodes connected by Elon Musk."
+    for leak in ("LLM fallback", "ValueError", "no JSON object"):
+        assert leak not in t.summary

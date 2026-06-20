@@ -12,6 +12,8 @@ bridge-driven mechanical clustering so the digest pipeline never breaks.
 from __future__ import annotations
 
 import json
+import os
+import sys
 from dataclasses import dataclass
 from typing import Callable
 
@@ -19,6 +21,12 @@ from podmind import llm
 from podmind.frontmatter import EpisodePage
 from podmind.llm_json import extract_json as _extract_json
 from podmind.threads import Thread
+
+# MiniMax (and other reasoning models) emit a long <think> block before the
+# JSON. With a tight ceiling the JSON gets truncated and parsing fails, which
+# silently degrades the digest to the bridge fallback. Mirror the summarize
+# path's budget (bin/summarize.py MAX_OUTPUT_TOKENS) so the JSON survives.
+MAX_THREAD_TOKENS = int(os.environ.get("PODMIND_MAX_OUTPUT_TOKENS", "16000"))
 
 
 PROMPT_TEMPLATE = """You are clustering one user's recent podcast listening into 3–6 thematic threads. A thread is a coherent through-line that several episodes contribute to.
@@ -156,19 +164,34 @@ def synthesize_threads(
                                         reason=f"provider init failed: {e}")
 
         def chat_fn(p: str) -> tuple[str, llm.Usage]:
-            return provider.chat(p, json_mode=True, temperature=0.4, max_tokens=3500,
-                                 timeout=timeout)
+            return provider.chat(p, json_mode=True, temperature=0.4,
+                                 max_tokens=MAX_THREAD_TOKENS, timeout=timeout)
 
+    has_bridges = bool(person_bridges or topic_bridges)
     last_error = ""
     for attempt in range(2):
         try:
             content, _ = chat_fn(prompt)
-            return parse_llm_response(content, valid_slugs)
+            threads, uncat = parse_llm_response(content, valid_slugs)
         except (llm.LLMError, json.JSONDecodeError, ValueError, KeyError) as e:
             last_error = f"{type(e).__name__}: {str(e)[:200]}"
             continue
+        # A valid response with real threads — done. Also accept an empty result
+        # when there's nothing to thread (no cross-cutting entities this window).
+        if threads or not has_bridges:
+            return threads, uncat
+        # Parsed OK but 0 threads despite shared entities — a known stochastic
+        # miss from the model. Retry once for narrative threads; if the retry is
+        # also empty we fall through to entity grouping rather than ship an
+        # all-uncategorized digest.
+        last_error = "LLM returned 0 threads despite shared entities"
     return _mechanical_fallback(eps_with_slugs, person_bridges, topic_bridges,
                                 reason=last_error)
+
+
+def _entity_name(slug: str) -> str:
+    """Human-readable name from an entity slug: 'elon-musk' → 'Elon Musk'."""
+    return slug.replace("-", " ").replace("_", " ").strip().title() or slug
 
 
 def _mechanical_fallback(
@@ -178,17 +201,21 @@ def _mechanical_fallback(
     *,
     reason: str,
 ) -> tuple[list[Thread], list[str]]:
-    """When the LLM fails, generate threads mechanically so the pipeline
-    still produces a useful digest. One thread per top-3 bridges, named
-    by the slug (with a note that this is a fallback).
+    """When the LLM fails, group episodes by their strongest shared entity so
+    the digest still reads cleanly. Produces presentable, user-facing thread
+    names — the failure `reason` is logged, never shown in the digest.
     """
+    # Observability without leaking internals into the reader-facing digest.
+    print(f"threads: LLM synthesis unavailable ({reason}); "
+          f"grouping by shared entity", file=sys.stderr)
+
     valid_slugs = {slug for slug, _ in eps_with_slugs}
     placed: set[str] = set()
     threads: list[Thread] = []
 
     candidates = (
-        [(f"Person: {p}", eps) for p, eps in person_bridges.items()] +
-        [(f"Topic: {t}", eps) for t, eps in topic_bridges.items()]
+        [(_entity_name(p), eps) for p, eps in person_bridges.items()] +
+        [(_entity_name(t), eps) for t, eps in topic_bridges.items()]
     )
     candidates.sort(key=lambda kv: -len(kv[1]))
     for name, eps in candidates[:5]:
@@ -196,7 +223,7 @@ def _mechanical_fallback(
         if len(new_eps) >= 2:
             threads.append(Thread(
                 name=name,
-                summary=f"(LLM fallback — {reason}) Episodes sharing this entity.",
+                summary=f"Episodes connected by {name}.",
                 episode_slugs=new_eps,
             ))
             placed.update(new_eps)

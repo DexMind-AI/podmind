@@ -109,10 +109,11 @@ class Thread:
 # ---------- Markdown rendering ----------
 
 def _badge_for(ep: EpisodePage, duration_sec: int = 0) -> str:
-    """Listened-state badge: 🎧 listened, ▶ N% in progress, ⚪ unplayed.
+    """Listened-state badge: 🎧 listened, ⚪ unplayed, and for in-progress
+    episodes "🎧 N%" when `duration_sec` is given (the email path) or a bare
+    "▶" when it isn't (the markdown path, which has no duration to compute %).
 
     Matches the convention in docs/AGENTS-vault.md and `refresh_badges.badge_for`.
-    Duration is optional — if present and we have played_up_to, compute %.
     """
     if ep.listened:
         return "🎧"
@@ -120,7 +121,10 @@ def _badge_for(ep: EpisodePage, duration_sec: int = 0) -> str:
         if duration_sec and ep.played_up_to >= 0.95 * duration_sec:
             return "🎧"
         if duration_sec:
-            return f"▶ {int(ep.played_up_to / duration_sec * 100)}%"
+            # Headphones + percent: clearly a podcast in progress, and distinct
+            # from the YouTube ▶️ badge. 0% (a few seconds in) still shows, per
+            # "if it's not fully listened, show the %".
+            return f"🎧 {int(ep.played_up_to / duration_sec * 100)}%"
         return "▶"
     return "⚪"
 
