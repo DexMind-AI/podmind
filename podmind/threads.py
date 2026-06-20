@@ -108,6 +108,19 @@ class Thread:
 
 # ---------- Markdown rendering ----------
 
+_HOOK_PREFIX_RE = re.compile(r"^[🎧▶⚪][^—]*—\s*(.*)")
+
+
+def strip_hook_prefix(hook: str) -> str:
+    """Strip a leading listened-badge + show-link prefix from a hook line,
+    leaving just the editorial sentence. Shared by the markdown digest
+    (format_threads_md) and the email renderer (digest_email)."""
+    if not hook:
+        return ""
+    m = _HOOK_PREFIX_RE.match(hook)
+    return (m.group(1) if m else hook).strip()
+
+
 def _badge_for(ep: EpisodePage, duration_sec: int = 0) -> str:
     """Listened-state badge: 🎧 listened, ⚪ unplayed, and for in-progress
     episodes "🎧 N%" when `duration_sec` is given (the email path) or a bare
@@ -147,7 +160,9 @@ def format_threads_md(
     out: list[str] = []
     n_eps = sum(len(t.episode_slugs) for t in threads) + len(uncategorized)
     out.append(f"# Threads — {date_str}\n")
-    out.append(f"_{n_eps} episodes across {len(threads)} threads in {window_label}._\n")
+    ep_word = "episode" if n_eps == 1 else "episodes"
+    th_word = "thread" if len(threads) == 1 else "threads"
+    out.append(f"_{n_eps} {ep_word} across {len(threads)} {th_word} in {window_label}._\n")
 
     for t in sorted(threads, key=lambda th: -len(th.episode_slugs)):
         out.append(f"## {t.name} ({len(t.episode_slugs)} episodes)\n")
@@ -157,10 +172,7 @@ def format_threads_md(
             badge = _badge_for(ep) if ep else "⚪"
             hook_snippet = ""
             if ep and ep.hook:
-                # Strip leading badge + show-link from the hook so the
-                # bullet is just the editorial sentence.
-                m = re.match(r"^[🎧▶⚪][^—]*—\s*(.*)", ep.hook)
-                hook_snippet = (m.group(1) if m else ep.hook).strip()
+                hook_snippet = strip_hook_prefix(ep.hook)
                 if len(hook_snippet) > 120:
                     hook_snippet = hook_snippet[:117] + "..."
             line = f"- [[episodes/{slug}]] {badge}"

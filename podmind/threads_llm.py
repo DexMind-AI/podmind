@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from typing import Callable
@@ -65,13 +66,43 @@ RULES
 """
 
 
+# Bullets under the episode page's "## Key takeaways" heading, up to the next
+# "## " section. Fed to the clusterer so it sees more than a one-line hook.
+_TAKEAWAYS_RE = re.compile(r"^##\s*Key takeaways\s*$(.*?)(?=^##\s|\Z)",
+                           re.M | re.S | re.I)
+TAKEAWAYS_PER_EPISODE = 3
+
+
+def key_takeaways(ep: EpisodePage, limit: int = TAKEAWAYS_PER_EPISODE) -> list[str]:
+    """First `limit` bullets under the episode's '## Key takeaways' heading.
+
+    Bounded so a large window doesn't blow the prompt budget — the hook plus a
+    few takeaways is enough signal for clustering."""
+    if not ep.body:
+        return []
+    m = _TAKEAWAYS_RE.search(ep.body)
+    if not m:
+        return []
+    bullets: list[str] = []
+    for line in m.group(1).splitlines():
+        line = line.strip()
+        if line.startswith("- "):
+            bullets.append(line[2:].strip())
+            if len(bullets) >= limit:
+                break
+    return bullets
+
+
 def format_episodes_for_prompt(eps_with_slugs: list[tuple[str, EpisodePage]]) -> str:
-    """Compact representation: slug + show + date + hook. Keep it short so
-    we can fit a typical 30-50 episode window in the context window
-    without blowing past max_tokens."""
+    """Compact representation: slug + show + date + hook + a few key takeaways.
+    Capped per episode (TAKEAWAYS_PER_EPISODE) so a typical 30-50 episode window
+    still fits the context window without blowing past max_tokens."""
     blocks: list[str] = []
     for slug, ep in eps_with_slugs:
         block = f"slug: {slug}\nshow: {ep.show or '?'}\ndate: {ep.date or '?'}\nhook: {ep.hook}"
+        takeaways = key_takeaways(ep)
+        if takeaways:
+            block += "\ntakeaways:\n" + "\n".join(f"  - {t}" for t in takeaways)
         blocks.append(block)
     return "\n---\n".join(blocks)
 
@@ -164,7 +195,9 @@ def synthesize_threads(
                                         reason=f"provider init failed: {e}")
 
         def chat_fn(p: str) -> tuple[str, llm.Usage]:
-            return provider.chat(p, json_mode=True, temperature=0.4,
+            # Low temperature: clustering should be stable run-to-run, not
+            # creative — reduces empty/erratic rolls on the same window.
+            return provider.chat(p, json_mode=True, temperature=0.1,
                                  max_tokens=MAX_THREAD_TOKENS, timeout=timeout)
 
     has_bridges = bool(person_bridges or topic_bridges)

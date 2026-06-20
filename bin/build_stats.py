@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --with matplotlib --with pandas python
+#!/usr/bin/env -S uv run --extra stats python
 """build_stats — generate wiki/stats.md + wiki/stats/*.png from raw/episodes data.
 
 Draws on patterns from Spotify Wrapped, Last.fm, Strava, GitHub contributions:
@@ -11,6 +11,7 @@ Draws on patterns from Spotify Wrapped, Last.fm, Strava, GitHub contributions:
 All charts saved as PNG into wiki/stats/. The stats.md page is regeneratable —
 re-run any time after new ingests.
 """
+import argparse
 import json
 import re
 from collections import Counter, defaultdict
@@ -28,7 +29,7 @@ ROOT = DATA_ROOT
 WIKI = WIKI_DIR
 RAW = EPISODES_DIR
 OUT = WIKI / "stats"
-OUT.mkdir(exist_ok=True)
+OUT.mkdir(parents=True, exist_ok=True)
 
 # Visual style: clean, minimal, dark-on-light. Matches Obsidian default.
 plt.rcParams.update({
@@ -82,6 +83,8 @@ def load_episodes() -> pd.DataFrame:
             "transcript_source": d.get("transcript_source"),
             "raw_dir": f"{show}/{m.parent.name}",
         })
+    if not rows:
+        return pd.DataFrame(columns=["show", "is_yt", "day", "year", "month", "listened", "duration_sec", "transcript_source", "raw_dir"])
     return pd.DataFrame(rows)
 
 
@@ -435,6 +438,7 @@ def build_md(df: pd.DataFrame, meta: dict, charts: dict) -> str:
 
 
 def main() -> None:
+    argparse.ArgumentParser(description=__doc__).parse_args()
     print("[1/3] loading episode data...")
     df = load_episodes()
     meta = load_wiki_meta()

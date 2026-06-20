@@ -11,7 +11,6 @@ See docs/superpowers/specs/2026-06-17-digest-email-readability-design.md.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from html import escape
 from typing import Callable
@@ -19,7 +18,7 @@ from urllib.parse import quote
 
 from podmind import paths
 from podmind.frontmatter import EpisodePage
-from podmind.threads import Thread, _badge_for
+from podmind.threads import Thread, _badge_for, strip_hook_prefix
 
 
 @dataclass(frozen=True)
@@ -30,8 +29,6 @@ class EpisodeMeta:
 
 
 MetaLoader = Callable[[str, "EpisodePage | None"], EpisodeMeta]
-
-_HOOK_PREFIX_RE = re.compile(r"^[🎧▶⚪][^—]*—\s*(.*)")
 
 
 def _slug_to_title(slug: str) -> str:
@@ -64,12 +61,8 @@ def _vault_link(slug: str, vault_name: str) -> str:
 
 
 def _hook_text(ep: EpisodePage | None) -> str:
-    """The editorial hook sentence, with any leading badge + show-link prefix
-    stripped (mirrors threads.format_threads_md)."""
-    if not ep or not ep.hook:
-        return ""
-    m = _HOOK_PREFIX_RE.match(ep.hook)
-    return (m.group(1) if m else ep.hook).strip()
+    """The editorial hook sentence, badge + show-link prefix stripped."""
+    return strip_hook_prefix(ep.hook) if ep else ""
 
 
 def _source_badge(slug: str, ep: EpisodePage | None) -> str:

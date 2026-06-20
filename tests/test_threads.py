@@ -21,6 +21,8 @@ from podmind.threads import (
 from podmind.threads_llm import (
     parse_llm_response,
     synthesize_threads,
+    key_takeaways,
+    format_episodes_for_prompt,
     _extract_json,
 )
 
@@ -168,6 +170,14 @@ class TestFormatThreadsMd:
         threads = [Thread(name="X", summary="Y", episode_slugs=["a", "b"])]
         md = format_threads_md(threads, [], date_str="2026-05-14")
         assert "Uncategorized" not in md
+
+    def test_summary_line_pluralizes(self):
+        one_thread = format_threads_md(
+            [Thread(name="X", summary="Y", episode_slugs=["a", "b"])],
+            [], date_str="2026-05-14")
+        assert "2 episodes across 1 thread in" in one_thread   # "1 thread", not "1 threads"
+        one_ep = format_threads_md([], ["a"], date_str="2026-05-14")
+        assert "1 episode across 0 threads in" in one_ep       # "1 episode", not "1 episodes"
 
     def test_badge_for_listened_episode(self):
         ep = EpisodePage(raw_dir="x/y", date="2026-01-01", show=None,
@@ -410,6 +420,57 @@ def test_badge_for_unplayed_is_circle():
 def test_entity_name_dekebabs():
     from podmind.threads_llm import _entity_name
     assert _entity_name("elon-musk") == "Elon Musk"
+
+
+def test_strip_hook_prefix_shared_helper():
+    from podmind.threads import strip_hook_prefix
+    assert strip_hook_prefix("🎧 [[shows/x]] — The real sentence.") == "The real sentence."
+    assert strip_hook_prefix("No prefix here.") == "No prefix here."
+    assert strip_hook_prefix("") == ""
+
+
+_EP_BODY = """🎧 [[shows/x]] — A hook sentence.
+
+## Key takeaways
+
+- First takeaway about SpaceX.
+- Second takeaway about Iran.
+- Third takeaway about AI.
+- Fourth takeaway should be dropped.
+
+## Notable quotes
+
+- "not a takeaway"
+"""
+
+
+def test_key_takeaways_extracts_capped_bullets():
+    ep = _badge_ep()
+    ep = EpisodePage(raw_dir="x/y", date="2026-01-01", show="S", listened=True,
+                     played_up_to=0, duration_min=30, guests=[],
+                     transcript_source=None, body=_EP_BODY, hook="A hook sentence.")
+    got = key_takeaways(ep)
+    assert got == ["First takeaway about SpaceX.",
+                   "Second takeaway about Iran.",
+                   "Third takeaway about AI."]   # capped at 3, quotes excluded
+
+
+def test_key_takeaways_none_when_section_absent():
+    ep = EpisodePage(raw_dir="x/y", date="2026-01-01", show="S", listened=True,
+                     played_up_to=0, duration_min=30, guests=[],
+                     transcript_source=None, body="🎧 just a hook, no sections.",
+                     hook="just a hook")
+    assert key_takeaways(ep) == []
+
+
+def test_prompt_includes_takeaways():
+    ep = EpisodePage(raw_dir="x/y", date="2026-01-01", show="S", listened=True,
+                     played_up_to=0, duration_min=30, guests=[],
+                     transcript_source=None, body=_EP_BODY, hook="A hook sentence.")
+    block = format_episodes_for_prompt([("ep-a", ep)])
+    assert "takeaways:" in block
+    assert "First takeaway about SpaceX." in block
+    assert "Fourth takeaway should be dropped." not in block
 
 
 def test_fallback_copy_has_no_internal_leakage():
